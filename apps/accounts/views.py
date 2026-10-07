@@ -1,30 +1,33 @@
-import io
 import base64
+import io
+
 import qrcode
-from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib import messages
 from django.contrib.auth import logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
-from django.contrib import messages
 from django.core.exceptions import PermissionDenied
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
-from apps.accounts.models import User, StudentProfile
+
 from apps.accounts.forms import (
     LoginForm,
-    StudentProfileEditForm,
-    PasswordChangeCustomForm,
     MFAVerifyForm,
+    PasswordChangeCustomForm,
+    StudentProfileEditForm,
 )
+from apps.accounts.models import User
 from apps.accounts.services import (
     authenticate_and_login,
     complete_user_login,
+    generate_backup_codes,
     generate_totp_secret,
     get_totp_provisioning_uri,
-    generate_backup_codes,
-    verify_totp,
     verify_backup_code,
+    verify_totp,
 )
-from apps.core.permissions import can_edit_student_profile, ROLE_STUDENT
-from apps.core.utils import log_audit_event, log_security_event, get_client_ip
+from apps.core.permissions import ROLE_STUDENT, can_edit_student_profile
+from apps.core.utils import get_client_ip, log_audit_event, log_security_event
+
 
 def login_view(request):
     if request.user.is_authenticated:
@@ -93,10 +96,22 @@ def mfa_verify_view(request):
 
 def mfa_setup_view(request):
     user_id = request.session.get('pre_mfa_user_id')
-    if not user_id and request.user.is_authenticated:
-        user = request.user
-    elif user_id:
+    if user_id:
         user = get_object_or_404(User, id=user_id)
+        if user.is_mfa_enabled:
+            # Audit finding A-1 (containment): a password-only "pre-MFA" session must never be able to
+            # enroll a NEW authenticator for an account that already has one -- that would bypass MFA.
+            log_security_event(
+                'MFA_FAILURE', user=user, ip_address=get_client_ip(request),
+                endpoint=request.path, details={'reason': 'enrollment_blocked_device_exists'},
+            )
+            return redirect('accounts:mfa_verify')
+    elif request.user.is_authenticated:
+        if request.user.is_mfa_enabled:
+            # Re-enrollment requires password + current code re-authentication (Phase 3). Until that
+            # flow exists, replacing an existing device from a session is refused.
+            raise PermissionDenied("MFA is already configured for this account.")
+        user = request.user
     else:
         return redirect('accounts:login')
 
