@@ -1,0 +1,50 @@
+name: ci
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci_owner
+          POSTGRES_PASSWORD: ci-only-not-a-secret  # secret-scan: allow (ephemeral CI container)
+          POSTGRES_DB: school_portal
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ci_owner" --health-interval 5s --health-retries 10
+    env:
+      DB_ENGINE: postgresql
+      DB_NAME: school_portal
+      DB_USER: ci_owner
+      DB_PASSWORD: ci-only-not-a-secret  # secret-scan: allow
+      DB_HOST: localhost
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.13"}
+      - run: pip install -r requirements/dev.txt
+      - name: Secret scan
+        run: python scripts/secret_scan.py
+      - name: Lint
+        run: ruff check .
+      - name: Bandit
+        run: bandit -q -ll -c pyproject.toml -r apps portal_config
+      - name: Dependency audit
+        run: pip-audit -r requirements/prod.txt
+      - name: Migrations are committed
+        run: python manage.py makemigrations --check --dry-run --settings=portal_config.settings.testing
+      - name: Tests (PostgreSQL)
+        run: pytest --cov --cov-report=term-missing
+      - name: Deploy checks with production settings
+        env:
+          DJANGO_SETTINGS_MODULE: portal_config.settings.production
+          DJANGO_SECRET_KEY: ${{ github.run_id }}-ci-only-random-key-${{ github.sha }}
+          DJANGO_ALLOWED_HOSTS: portal.example.test
+          DB_USER: portal_app
+          DB_SSLMODE: require
+          REDIS_URL: redis://localhost:6379/0
+        run: python manage.py check --deploy --fail-level WARNING

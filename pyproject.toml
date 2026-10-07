@@ -1,0 +1,29 @@
+[project]
+name = "school-portal"
+version = "0.1.0"
+requires-python = ">=3.12"
+description = "University student information and services portal"
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = ["*/migrations/*", ".venv", "venv", "staticfiles"]
+
+[tool.ruff.lint]
+# E/F/W: correctness, I: imports, B: bugbear, S: bandit-style security rules, DJ: Django rules
+select = ["E", "F", "W", "I", "B", "S", "DJ", "UP"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106", "S108", "S603", "S607"]
+"**/tests/**" = ["S101", "S105", "S106", "S603", "S607"]
+"scripts/**" = ["S603", "S607"]
+
+[tool.bandit]
+exclude_dirs = ["tests", ".venv", "venv", "staticfiles"]
+skips = ["B101"]
+
+[tool.coverage.run]
+source = ["apps", "portal_config"]
+omit = ["*/migrations/*", "*/tests/*"]
+branch = true

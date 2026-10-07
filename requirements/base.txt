@@ -1,0 +1,11 @@
+# Runtime dependencies (pinned). Update deliberately; CI runs pip-audit on every push.
+Django==5.2.18            # 5.2 LTS, security support until April 2028
+djangorestframework==3.18.3
+argon2-cffi==25.1.0       # Argon2id password hashing
+pyotp==2.10.0             # TOTP for MFA
+cryptography==50.0.2      # MultiFernet encryption of MFA secrets at rest
+qrcode[pil]==8.2          # MFA enrollment QR code (rendered server-side as data: URI)
+pillow==12.3.0            # image decoding / re-encoding of uploads
+whitenoise==6.12.0        # hashed, compressed static files
+psycopg[binary]==3.3.6    # PostgreSQL driver
+redis==8.1.0              # cache + rate-limit counters (Django's built-in RedisCache backend)
