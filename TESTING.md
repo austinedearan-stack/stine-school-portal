@@ -89,6 +89,12 @@ Markers: `postgres` (requires PostgreSQL — skipped on SQLite), `slow`.
 * Fix found by the tests: refusing an expired offer used to roll back the expiry itself; the expiry now commits and the
   refusal is raised afterwards.
 
+## Phase 8 results (2026-10-08)
+
+* 295 passed, 7 skipped. `tests/clubs/test_clubs.py` (16): approval by default, open clubs, duplicate/rejoin, advisor/officer decisions,
+  officers without approval rights, self-action refusal, officer-vs-officer removal, appointment rules and
+  self-promotion, advisor reassignment, event visibility and notifications, member-list privacy, id-guessing.
+
 ## Required categories (spec §35) — coverage plan
 
 | Category | Phase(s) |

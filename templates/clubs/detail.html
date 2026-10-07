@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}{{ club.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div><h1>{{ club.name }}</h1><p>{{ club.get_kind_display }}{% if club.category %} · {{ club.category }}{% endif %} · {{ member_count }} member{{ member_count|pluralize }}</p></div>
+  <div class="row">
+    {% if can_view_members %}<a class="btn btn-secondary" href="{% url 'clubs:members' club.pk %}">Members</a>{% endif %}
+    {% if can_events %}<a class="btn btn-secondary" href="{% url 'clubs:event_create' club.pk %}">Add event</a>{% endif %}
+    {% if can_manage %}<a class="btn btn-secondary" href="{% url 'clubs:edit' club.pk %}">Edit club</a>{% endif %}
+  </div>
+</div>
+<div class="grid grid-2">
+  <section class="card">
+    <h2>About</h2>
+    <p class="prewrap">{{ club.description|default:"No description yet." }}</p>
+    <dl class="details">
+      <dt>Meetings</dt><dd>{{ club.meeting_info|default:"–" }}</dd>
+      <dt>Advisor</dt><dd>{{ club.advisor.user.full_name|default:"–" }}</dd>
+      <dt>Contact</dt><dd>{{ club.contact_email|default:"–" }}</dd>
+      <dt>Joining</dt><dd>{% if club.requires_approval %}Requests are approved by the club{% else %}Open membership{% endif %}</dd>
+    </dl>
+    {% if user.role == "STUDENT" %}
+      {% if membership %}
+        <p><span class="badge {% if membership.status == 'APPROVED' %}badge-ok{% else %}badge-warn{% endif %}">{{ membership.get_status_display }}</span>{% if membership.position != "MEMBER" %} <span class="badge badge-info">{{ membership.get_position_display }}</span>{% endif %}</p>
+        <form method="post" action="{% url 'clubs:leave' club.pk %}">{% csrf_token %}<button class="btn btn-secondary" type="submit">{% if membership.status == "APPROVED" %}Leave club{% else %}Withdraw request{% endif %}</button></form>
+      {% elif club.is_active %}
+        <form method="post" action="{% url 'clubs:join' club.pk %}">{% csrf_token %}<button class="btn" type="submit">{% if club.requires_approval %}Ask to join{% else %}Join{% endif %}</button></form>
+      {% endif %}
+    {% endif %}
+  </section>
+  <section class="card">
+    <h2>Upcoming events</h2>
+    {% for e in events %}
+      <div class="tt-slot"><strong>{{ e.title }}</strong>{% if e.visibility == "MEMBERS" %} <span class="badge">Members</span>{% endif %}<br>
+        <span class="small">{{ e.starts_at|date:"D j M H:i" }}–{{ e.ends_at|date:"H:i" }} · {{ e.location|default:"TBA" }}</span>
+        {% if e.description %}<div class="small prewrap">{{ e.description }}</div>{% endif %}
+        {% if can_events %}<a class="small" href="{% url 'clubs:event_edit' club.pk e.pk %}">Edit</a>{% endif %}</div>
+    {% empty %}<p class="empty">No upcoming events.</p>{% endfor %}
+  </section>
+</div>
+{% endblock %}

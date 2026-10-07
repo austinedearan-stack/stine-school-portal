@@ -15,7 +15,7 @@ the project brief, with the server — not the browser — enforcing every secur
 | 5 | Units & registration | **Done** — see below |
 | 6 | Timetable | **Done** — see below |
 | 7 | Hostels | **Done** — see below |
-| 8 | Clubs & societies | Not started |
+| 8 | Clubs & societies | **Done** — see below |
 | 9 | Requests & transfers | Not started |
 | 10 | Admin panel | Not started |
 | 11 | Notifications & announcements | Not started |
@@ -23,6 +23,17 @@ the project brief, with the server — not the browser — enforcing every secur
 
 **This is not yet a usable portal.** The inherited code was audited and several critical issues
 were found; until each feature phase is complete and tested, treat every feature as unfinished.
+
+Phase 8 delivered:
+
+* Directory of clubs and societies with search, kind and category filters; club pages with meeting info, advisor,
+  public events (members-only events visible to members, officers, the advisor and the office).
+* Membership: requests are PENDING unless a club explicitly opts out of approval (audit Z-7); leave/withdraw;
+  re-joining after leaving is allowed. Decisions by the advisor, `manage_clubs` holders, or officers with
+  "can approve members" — officers decide on ordinary members only and nobody acts on their own membership.
+* Officer appointment (position, approval right) only by the advisor or `manage_clubs`; an advisor cannot reassign
+  the advisor role. Leaving drops any office. Member lists are visible only to officers, the advisor and the office.
+* Events by officers/advisor/office with member notifications; club creation by `manage_clubs`.
 
 Phase 7 delivered:
 

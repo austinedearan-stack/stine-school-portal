@@ -35,6 +35,7 @@ NAV_ITEMS = [
     NavItem("Hostels", "hostels:catalog", "Services"),
     NavItem("My accommodation", "hostels:my_hostel", "Services", roles=(Role.STUDENT,)),
     NavItem("Clubs & societies", "clubs:directory", "Services"),
+    NavItem("My clubs", "clubs:my_clubs", "Services", roles=(Role.STUDENT,)),
     NavItem("My requests", "requests:my_requests", "Services", roles=(Role.STUDENT,)),
     NavItem("Request queue", "requests:queue", "Services", any_capability=("review_requests",)),
     NavItem("Announcements", "notifications:announcements", "Services"),

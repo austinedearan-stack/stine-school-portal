@@ -52,7 +52,7 @@ lands (see `ARCHITECTURE.md` §9). ✅ = fixed in Phase 1 with a regression test
 | Z-4 | H | Admin request panel: new status is taken verbatim from POST (`ticket.status = new_status`) — no allowlist, no state machine; `assigned_to` accepts any staff id. | 9–10 |
 | Z-5 | H | Approved transfers can be "executed" repeatedly, outside a transaction, regardless of transfer type. | 9 |
 | Z-6 | M | All ADMINs have all admin powers (`role_required(ADMIN, SUPERADMIN)`), no granular permissions (spec §34). | ✅ 3 |
-| Z-7 | M | Club join auto-approves membership (spec requires approval). | 8 |
+| Z-7 | M | Club join auto-approves membership (spec requires approval). | ✅ 8 |
 | Z-8 | M | Request `priority` accepted from student POST without validation (mass assignment / 500 on long values). | 9 |
 | Z-9 | M | Students can reply to CLOSED/CANCELLED requests; no attachment count limit. | 9 |
 | Z-10 | L | Notification "mark read" is a state change via GET. | 11 |

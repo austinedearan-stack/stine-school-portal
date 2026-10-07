@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Clubs & societies{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div><h1>Clubs &amp; societies</h1><p>Find a community and ask to join.</p></div>
+  {% if user.role == "STUDENT" %}<a class="btn btn-secondary" href="{% url 'clubs:my_clubs' %}">My clubs</a>{% endif %}
+</div>
+<form method="get" class="filters card">
+  {% for field in form %}<div class="field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}</div>{% endfor %}
+  <button class="btn" type="submit">Search</button>
+</form>
+<div class="grid grid-3">
+{% for club in page.object_list %}
+  <section class="card">
+    <h2><a href="{% url 'clubs:detail' club.pk %}">{{ club.name }}</a></h2>
+    <p><span class="badge">{{ club.get_kind_display }}</span>{% if club.category %} <span class="badge">{{ club.category }}</span>{% endif %}</p>
+    <p class="small">{{ club.description|truncatewords:25 }}</p>
+    <p class="small muted">{{ club.member_count }} member{{ club.member_count|pluralize }}{% if club.meeting_info %} · {{ club.meeting_info }}{% endif %}</p>
+  </section>
+{% empty %}
+  <div class="card"><p class="empty">No clubs match your search.</p></div>
+{% endfor %}
+</div>
+{% include "partials/pagination.html" %}
+{% endblock %}

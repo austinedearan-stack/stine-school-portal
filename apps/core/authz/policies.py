@@ -170,3 +170,57 @@ def can_book_bed(actor, student) -> bool:
 def can_view_hostel_application(actor, application) -> bool:
     """Includes special needs: the applicant and manage_hostels holders only."""
     return application.student.user_id == actor.pk or has_capability(actor, "manage_hostels")
+
+
+# --- Clubs (audit Z-7) -----------------------------------------------------------------------------
+
+
+def _is_advisor(actor, club) -> bool:
+    staff = getattr(actor, "staff_profile", None)
+    return staff is not None and club.advisor_id == staff.pk
+
+
+def _officer_membership(actor, club):
+    from apps.clubs.models import MembershipStatus
+
+    student = getattr(actor, "student_profile", None)
+    if actor.role != Role.STUDENT or student is None:
+        return None
+    return club.memberships.filter(student=student, status=MembershipStatus.APPROVED, can_manage_members=True).first()
+
+
+@policy("can_manage_club")
+def can_manage_club(actor, club) -> bool:
+    """Edit club details, appoint officers and remove members: the club's advisor or manage_clubs holders."""
+    if club is None:
+        return has_capability(actor, "manage_clubs")
+    return has_capability(actor, "manage_clubs") or _is_advisor(actor, club)
+
+
+@policy("can_review_membership")
+def can_review_membership(actor, membership) -> bool:
+    """Approve/reject/remove: advisor, manage_clubs, or a member-managing officer - never one's own membership."""
+    if membership.student.user_id == actor.pk:
+        return False
+    club = membership.club
+    if can_manage_club(actor, club):
+        return True
+    officer = _officer_membership(actor, club)
+    # Officers decide on ordinary members only; officers are appointed and removed by the advisor/office.
+    return officer is not None and membership.position == "MEMBER" and not membership.can_manage_members
+
+
+@policy("can_view_club_members")
+def can_view_club_members(actor, club) -> bool:
+    return can_manage_club(actor, club) or _officer_membership(actor, club) is not None
+
+
+@policy("can_manage_club_events")
+def can_manage_club_events(actor, club) -> bool:
+    return can_manage_club(actor, club) or _officer_membership(actor, club) is not None
+
+
+@policy("can_act_for_student")
+def can_act_for_student(actor, student) -> bool:
+    """Self-service student actions (join/leave a club, ...): only the student themself."""
+    return actor.role == Role.STUDENT and student is not None and student.user_id == actor.pk

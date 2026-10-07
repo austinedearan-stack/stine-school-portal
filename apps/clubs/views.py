@@ -1,136 +1,207 @@
+"""Clubs and societies (Phase 8)."""
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import PermissionDenied
-from django.shortcuts import get_object_or_404, redirect, render
-from django.utils import timezone
+from django.core.paginator import Paginator
+from django.http import Http404
+from django.shortcuts import redirect, render
+from django.views.decorators.http import require_http_methods, require_POST
 
-from apps.clubs.models import Club, ClubEvent, ClubMembership
-from apps.core.permissions import ROLE_STUDENT
-from apps.core.utils import get_client_ip, log_audit_event
+from apps.clubs import selectors, services
+from apps.clubs.forms import AppointForm, ClubForm, DirectoryFilterForm, EventForm
+from apps.clubs.models import Club, ClubEvent, ClubMembership, MembershipStatus
+from apps.core.authz import deny, get_in_scope_or_404, is_allowed
+from apps.core.authz.decorators import capability_required, role_required
+from apps.core.capabilities import Role
+from apps.core.context import RequestContext
+
+
+def _student(request):
+    return getattr(request.user, "student_profile", None) if request.user.role == Role.STUDENT else None
+
+
+def _club_or_404(club_id, *, active_only=True):
+    qs = Club.objects.select_related("advisor__user")
+    if active_only:
+        qs = qs.filter(is_active=True)
+    club = qs.filter(pk=club_id).first()
+    if club is None:
+        raise Http404
+    return club
 
 
 @login_required
-def club_directory_view(request):
-    category = request.GET.get('cat', '').strip()
-    query = request.GET.get('q', '').strip()
+def directory_view(request):
+    form = DirectoryFilterForm(request.GET or None, categories=selectors.categories())
+    filters = form.cleaned_data if form.is_valid() else {}
+    clubs = selectors.directory(query=(filters.get("q") or "").strip(), kind=filters.get("kind", ""),
+                                category=filters.get("category", ""))
+    query = request.GET.copy()
+    query.pop("page", None)
+    return render(request, "clubs/directory.html", {
+        "form": form, "page": Paginator(clubs, 24).get_page(request.GET.get("page")), "query": query.urlencode()})
 
-    clubs = Club.objects.filter(is_active=True).prefetch_related('memberships')
-    if category:
-        clubs = clubs.filter(category=category)
-    if query:
-        clubs = clubs.filter(name__icontains=query)
 
-    my_memberships = {}
-    if request.user.role == ROLE_STUDENT and hasattr(request.user, 'student_profile'):
-        memberships = ClubMembership.objects.filter(student=request.user.student_profile)
-        for m in memberships:
-            my_memberships[m.club_id] = m.status
-
-    return render(request, 'clubs/directory.html', {
-        'clubs': clubs,
-        'selected_category': category,
-        'categories': Club.CATEGORY_CHOICES,
-        'query': query,
-        'my_memberships': my_memberships,
+@login_required
+def detail_view(request, club_id):
+    club = _club_or_404(club_id, active_only=not is_allowed(request.user, "can_manage_clubs_admin"))
+    membership = selectors.membership_of(_student(request), club)
+    insider = (membership is not None and membership.status == MembershipStatus.APPROVED) or is_allowed(
+        request.user, "can_view_club_members", club)
+    return render(request, "clubs/detail.html", {
+        "club": club, "membership": membership,
+        "events": selectors.visible_events(club, include_members_only=insider),
+        "member_count": club.memberships.filter(status=MembershipStatus.APPROVED).count(),
+        "can_view_members": is_allowed(request.user, "can_view_club_members", club),
+        "can_manage": is_allowed(request.user, "can_manage_club", club),
+        "can_events": is_allowed(request.user, "can_manage_club_events", club),
     })
 
 
-@login_required
-def club_detail_view(request, club_code):
-    club = get_object_or_404(Club, code=club_code, is_active=True)
-    events = ClubEvent.objects.filter(club=club, event_date__gte=timezone.now()).order_by('event_date')[:5]
-
-    membership = None
-    if request.user.role == ROLE_STUDENT and hasattr(request.user, 'student_profile'):
-        membership = ClubMembership.objects.filter(student=request.user.student_profile, club=club).first()
-
-    return render(request, 'clubs/club_detail.html', {
-        'club': club,
-        'events': events,
-        'membership': membership,
-    })
-
-
-@login_required
-def join_club_view(request):
-    if request.method != 'POST':
-        return redirect('clubs:directory')
-
-    if request.user.role != ROLE_STUDENT or not hasattr(request.user, 'student_profile'):
-        raise PermissionDenied("Only students may join clubs.")
-
-    club_id = request.POST.get('club_id')
-    club = get_object_or_404(Club, id=club_id, is_active=True)
-
-    membership, created = ClubMembership.objects.get_or_create(
-        student=request.user.student_profile,
-        club=club,
-        defaults={'status': 'APPROVED'}  # Direct auto-join or pending
-    )
-
-    if not created and membership.status == 'LEFT':
-        membership.status = 'APPROVED'
-        membership.save(update_fields=['status'])
-        messages.success(request, f"Re-joined {club.name} successfully!")
-    elif created:
-        messages.success(request, f"Joined {club.name} successfully!")
-    else:
-        messages.info(request, f"You are already a member of {club.name}.")
-
-    log_audit_event(
-        actor=request.user,
-        action='JOIN_CLUB',
-        target_model='ClubMembership',
-        target_id=str(membership.id),
-        changes={'club': club.name},
-        ip_address=get_client_ip(request)
-    )
-
-    return redirect('clubs:detail', club_code=club.code)
+@role_required(Role.STUDENT)
+@require_POST
+def join_view(request, club_id):
+    club = _club_or_404(club_id)
+    student = _student(request)
+    if student is None:
+        raise Http404
+    try:
+        membership = services.request_membership(request.user, student, club, RequestContext.from_request(request))
+        messages.success(request, "Request sent to the club." if membership.status == MembershipStatus.PENDING
+                         else f"You joined {club.name}.")
+    except services.ClubError as exc:
+        messages.error(request, exc.messages[0])
+    return redirect("clubs:detail", club_id=club.pk)
 
 
-@login_required
-def leave_club_view(request):
-    if request.method != 'POST':
-        return redirect('clubs:directory')
-
-    if request.user.role != ROLE_STUDENT or not hasattr(request.user, 'student_profile'):
-        raise PermissionDenied("Only students can perform this action.")
-
-    club_id = request.POST.get('club_id')
-    membership = get_object_or_404(
-        ClubMembership,
-        student=request.user.student_profile,
-        club_id=club_id,
-        status='APPROVED'
-    )
-
-    membership.status = 'LEFT'
-    membership.save(update_fields=['status'])
-
-    log_audit_event(
-        actor=request.user,
-        action='LEAVE_CLUB',
-        target_model='ClubMembership',
-        target_id=str(membership.id),
-        changes={'club': membership.club.name},
-        ip_address=get_client_ip(request)
-    )
-
-    messages.info(request, f"You have left {membership.club.name}.")
-    return redirect('clubs:my_clubs')
+@role_required(Role.STUDENT)
+@require_POST
+def leave_view(request, club_id):
+    club = _club_or_404(club_id, active_only=False)
+    membership = selectors.membership_of(_student(request), club)
+    if membership is None:
+        raise Http404
+    services.leave(request.user, membership, RequestContext.from_request(request))
+    messages.success(request, f"You left {club.name}." if membership.status == MembershipStatus.APPROVED
+                     else "Your request was withdrawn.")
+    return redirect("clubs:detail", club_id=club.pk)
 
 
-@login_required
+@role_required(Role.STUDENT)
 def my_clubs_view(request):
-    if request.user.role != ROLE_STUDENT or not hasattr(request.user, 'student_profile'):
-        return redirect('clubs:directory')
+    student = _student(request)
+    if student is None:
+        raise Http404
+    return render(request, "clubs/my_clubs.html", {"memberships": selectors.my_memberships(student)})
 
-    memberships = ClubMembership.objects.filter(
-        student=request.user.student_profile,
-        status='APPROVED'
-    ).select_related('club')
 
-    return render(request, 'clubs/my_clubs.html', {
-        'memberships': memberships,
+@login_required
+def members_view(request, club_id):
+    ctx = RequestContext.from_request(request)
+    club = get_in_scope_or_404(request.user, "can_view_club_members", Club.objects.select_related("advisor__user"),
+                               ctx=ctx, pk=club_id)
+    members = list(selectors.members(club))
+    pending = list(selectors.pending(club))
+    return render(request, "clubs/members.html", {
+        "club": club,
+        "pending": [(m, is_allowed(request.user, "can_review_membership", m)) for m in pending],
+        "members": [(m, is_allowed(request.user, "can_review_membership", m)) for m in members],
+        "can_appoint": is_allowed(request.user, "can_manage_club", club),
+        "appoint_form": AppointForm(),
     })
+
+
+def _membership_or_404(membership_id):
+    membership = ClubMembership.objects.select_related("club__advisor", "student__user").filter(pk=membership_id).first()
+    if membership is None:
+        raise Http404
+    return membership
+
+
+@login_required
+@require_POST
+def decide_view(request, membership_id):
+    membership = _membership_or_404(membership_id)
+    ctx = RequestContext.from_request(request)
+    if not is_allowed(request.user, "can_view_club_members", membership.club):
+        raise Http404  # outsiders cannot probe membership ids
+    try:
+        services.decide(request.user, membership, request.POST.get("decision") == "approve", ctx)
+        messages.success(request, "Decision saved.")
+    except services.ClubError as exc:
+        messages.error(request, exc.messages[0])
+    return redirect("clubs:members", club_id=membership.club_id)
+
+
+@login_required
+@require_POST
+def remove_view(request, membership_id):
+    membership = _membership_or_404(membership_id)
+    if not is_allowed(request.user, "can_view_club_members", membership.club):
+        raise Http404
+    try:
+        services.remove(request.user, membership, RequestContext.from_request(request))
+        messages.success(request, "Member removed.")
+    except services.ClubError as exc:
+        messages.error(request, exc.messages[0])
+    return redirect("clubs:members", club_id=membership.club_id)
+
+
+@login_required
+@require_POST
+def appoint_view(request, membership_id):
+    membership = _membership_or_404(membership_id)
+    ctx = RequestContext.from_request(request)
+    if not is_allowed(request.user, "can_view_club_members", membership.club):
+        raise Http404
+    form = AppointForm(request.POST)
+    if form.is_valid():
+        try:
+            services.appoint(request.user, membership, form.cleaned_data["position"],
+                             form.cleaned_data["can_manage_members"], ctx)
+            messages.success(request, "Position updated.")
+        except services.ClubError as exc:
+            messages.error(request, exc.messages[0])
+    return redirect("clubs:members", club_id=membership.club_id)
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def club_form_view(request, club_id=None):
+    ctx = RequestContext.from_request(request)
+    if club_id is None:
+        if not is_allowed(request.user, "can_manage_clubs_admin"):
+            deny(request.user, "can_manage_clubs_admin", ctx=ctx)
+        club = None
+    else:
+        club = get_in_scope_or_404(request.user, "can_manage_club", Club.objects.all(), ctx=ctx, pk=club_id)
+    can_set_advisor = is_allowed(request.user, "can_manage_clubs_admin")
+    form = ClubForm(request.POST or None, instance=club, can_set_advisor=can_set_advisor)
+    if request.method == "POST" and form.is_valid():
+        club = services.save_club(request.user, form.save(commit=False), ctx, changed_fields=form.changed_data)
+        messages.success(request, "Club saved.")
+        return redirect("clubs:detail", club_id=club.pk)
+    return render(request, "clubs/club_form.html", {"form": form, "club": club})
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def event_form_view(request, club_id, event_id=None):
+    ctx = RequestContext.from_request(request)
+    club = get_in_scope_or_404(request.user, "can_manage_club_events", Club.objects.all(), ctx=ctx, pk=club_id)
+    event = ClubEvent.objects.filter(club=club, pk=event_id).first() if event_id else None
+    if event_id and event is None:
+        raise Http404
+    form = EventForm(request.POST or None, instance=event)
+    if request.method == "POST" and form.is_valid():
+        event = form.save(commit=False)
+        event.club = club
+        services.save_event(request.user, event, ctx)
+        messages.success(request, "Event saved.")
+        return redirect("clubs:detail", club_id=club.pk)
+    return render(request, "clubs/event_form.html", {"form": form, "club": club, "event": event})
+
+
+@capability_required("manage_clubs")
+def manage_view(request):
+    return render(request, "clubs/manage.html", {"clubs": Club.objects.select_related("advisor__user").order_by("name")})

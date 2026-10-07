@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}{% if event %}Edit event{% else %}New event{% endif %}{% endblock %}
+{% block content %}
+<div class="page-header"><div><h1>{% if event %}Edit event{% else %}New event{% endif %} · {{ club.name }}</h1><p>Members are notified about new events.</p></div></div>
+<div class="card"><form method="post" class="form" novalidate>
+  {% csrf_token %}
+  {% include "partials/form.html" %}
+  <button class="btn" type="submit">Save</button>
+  <a class="btn btn-secondary" href="{% url 'clubs:detail' club.pk %}">Cancel</a>
+</form></div>
+{% endblock %}

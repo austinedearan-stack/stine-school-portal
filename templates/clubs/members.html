@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}{{ club.name }} members{% endblock %}
+{% block content %}
+<div class="page-header"><div><h1>{{ club.name }} · members</h1></div><a class="btn btn-secondary" href="{% url 'clubs:detail' club.pk %}">Club page</a></div>
+<section class="card">
+  <h2>Pending requests</h2>
+  {% if pending %}
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Student</th><th>Program</th><th>Requested</th><th></th></tr></thead>
+    <tbody>{% for m, can_review in pending %}<tr>
+      <td>{{ m.student.user.full_name }} ({{ m.student.student_number }})</td><td>{{ m.student.program.code }}</td>
+      <td>{{ m.created_at|date:"j M Y" }}</td>
+      <td>{% if can_review %}<form method="post" action="{% url 'clubs:decide' m.pk %}" class="row">{% csrf_token %}
+        <button class="btn btn-success btn-small" type="submit" name="decision" value="approve">Approve</button>
+        <button class="btn btn-secondary btn-small" type="submit" name="decision" value="reject">Decline</button></form>{% endif %}</td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  {% else %}<p class="empty">No pending requests.</p>{% endif %}
+</section>
+<section class="card">
+  <h2>Members</h2>
+  {% if members %}
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Student</th><th>Position</th><th>Approves members</th>{% if can_appoint %}<th>Set position</th>{% endif %}<th></th></tr></thead>
+    <tbody>{% for m, can_review in members %}<tr>
+      <td>{{ m.student.user.full_name }} ({{ m.student.student_number }})</td>
+      <td>{{ m.get_position_display }}</td>
+      <td>{% if m.can_manage_members %}Yes{% else %}–{% endif %}</td>
+      {% if can_appoint %}<td><form method="post" action="{% url 'clubs:appoint' m.pk %}" class="row">{% csrf_token %}
+        <select name="position">{% for value, label in appoint_form.fields.position.choices %}<option value="{{ value }}"{% if value == m.position %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+        <label class="small"><input type="checkbox" name="can_manage_members"{% if m.can_manage_members %} checked{% endif %}> approves</label>
+        <button class="btn btn-secondary btn-small" type="submit">Save</button></form></td>{% endif %}
+      <td>{% if can_review %}<form method="post" action="{% url 'clubs:remove' m.pk %}">{% csrf_token %}<button class="btn btn-danger btn-small" type="submit">Remove</button></form>{% endif %}</td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  {% else %}<p class="empty">No members yet.</p>{% endif %}
+</section>
+{% endblock %}
