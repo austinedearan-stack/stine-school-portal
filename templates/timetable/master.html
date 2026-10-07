@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Master timetable{% endblock %}
+{% block content %}
+<div class="page-header"><div><h1>Master timetable</h1><p>{{ semester|default:"No current semester" }}</p></div></div>
+<form method="get" class="filters card">
+  {% for field in form %}<div class="field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}</div>{% endfor %}
+  <button class="btn" type="submit">Filter</button>
+</form>
+{% for day, entries in days %}
+<section class="card">
+  <h2>{{ day }}</h2>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Time</th><th>Unit</th><th>Type</th><th>Venue</th><th>Lecturer</th><th>Group</th></tr></thead>
+    <tbody>{% for e in entries %}<tr>
+      <td class="mono">{{ e.start_time|time:"H:i" }}–{{ e.end_time|time:"H:i" }}</td>
+      <td>{{ e.offering.unit.code }} {{ e.offering.unit.title }}</td>
+      <td>{{ e.get_class_type_display }}</td>
+      <td>{{ e.venue.code }}</td>
+      <td>{{ e.lecturer.user.full_name|default:"TBA" }}</td>
+      <td>{{ e.student_group|default:"–" }}</td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+{% empty %}
+<div class="card"><p class="empty">No classes match.</p></div>
+{% endfor %}
+{% endblock %}

@@ -31,3 +31,19 @@ def entries_for_lecturer(staff, semester):
         .select_related(*_RELATED)
         .order_by("day_of_week", "start_time")
     )
+
+
+def master(semester, *, department=None, venue=None, day=None, group=None):
+    """The public master timetable for a semester (visible to every signed-in user)."""
+    if semester is None:
+        return TimetableEntry.objects.none()
+    qs = TimetableEntry.objects.filter(semester=semester).select_related(*_RELATED, "offering__unit__department")
+    if department is not None:
+        qs = qs.filter(offering__unit__department=department)
+    if venue is not None:
+        qs = qs.filter(venue=venue)
+    if day:
+        qs = qs.filter(day_of_week=day)
+    if group is not None:
+        qs = qs.filter(student_group=group)
+    return qs.order_by("day_of_week", "start_time", "venue__code")

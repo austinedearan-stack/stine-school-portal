@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Manage timetable{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div><h1>Manage timetable</h1><p>{{ semester|default:"No current semester" }}</p></div>
+  <div class="row"><a class="btn" href="{% url 'timetable:entry_create' %}">Add class</a><a class="btn btn-secondary" href="{% url 'timetable:venue_create' %}">Add venue</a></div>
+</div>
+<section class="card">
+  <h2>Classes</h2>
+  {% if entries %}
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Day</th><th>Time</th><th>Unit</th><th>Type</th><th>Venue</th><th>Lecturer</th><th>Group</th><th></th></tr></thead>
+    <tbody>{% for e in entries %}<tr>
+      <td>{{ e.get_day_of_week_display }}</td>
+      <td class="mono">{{ e.start_time|time:"H:i" }}–{{ e.end_time|time:"H:i" }}</td>
+      <td>{{ e.offering.unit.code }}/{{ e.offering.section }}</td>
+      <td>{{ e.get_class_type_display }}</td>
+      <td>{{ e.venue.code }}</td>
+      <td>{{ e.lecturer.user.full_name|default:"TBA" }}</td>
+      <td>{{ e.student_group|default:"–" }}</td>
+      <td class="row">
+        <a class="btn btn-secondary btn-small" href="{% url 'timetable:entry_edit' e.pk %}">Edit</a>
+        <form method="post" action="{% url 'timetable:entry_delete' e.pk %}" class="inline">{% csrf_token %}<button class="btn btn-danger btn-small" type="submit">Delete</button></form>
+      </td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  {% else %}<p class="empty">No classes scheduled.</p>{% endif %}
+</section>
+<section class="card">
+  <h2>Venues</h2>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Code</th><th>Name</th><th>Building</th><th>Capacity</th><th>Type</th><th>Status</th><th></th></tr></thead>
+    <tbody>{% for v in venues %}<tr>
+      <td class="mono">{{ v.code }}</td><td>{{ v.name }}</td><td>{{ v.building }}</td><td>{{ v.capacity }}</td><td>{{ v.venue_type }}</td>
+      <td>{% if v.is_active %}<span class="badge badge-ok">In use</span>{% else %}<span class="badge">Retired</span>{% endif %}</td>
+      <td><a class="btn btn-secondary btn-small" href="{% url 'timetable:venue_edit' v.pk %}">Edit</a></td>
+    </tr>{% empty %}<tr><td colspan="7" class="empty">No venues.</td></tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+{% endblock %}

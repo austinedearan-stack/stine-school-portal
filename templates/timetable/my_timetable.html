@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}{{ heading }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div><h1>{{ heading }}</h1><p>{{ semester|default:"No current semester" }}</p></div>
+  <a class="btn btn-secondary" href="{% url 'timetable:master' %}">Master timetable</a>
+</div>
+<div class="grid grid-3">
+{% for day, entries in days %}
+  <section class="card tt-day">
+    <h2>{{ day }}</h2>
+    {% for e in entries %}
+      <div class="tt-slot">
+        <strong>{{ e.start_time|time:"H:i" }}–{{ e.end_time|time:"H:i" }}</strong> · {{ e.offering.unit.code }}<br>
+        <span class="small">{{ e.offering.unit.title }} · {{ e.get_class_type_display }} · {{ e.venue.name }}{% if e.lecturer %} · {{ e.lecturer.user.full_name }}{% endif %}{% if e.student_group %} · {{ e.student_group.label }}{% endif %}</span>
+      </div>
+    {% endfor %}
+  </section>
+{% empty %}
+  <div class="card"><p class="empty">Nothing scheduled this semester yet.</p></div>
+{% endfor %}
+</div>
+{% endblock %}

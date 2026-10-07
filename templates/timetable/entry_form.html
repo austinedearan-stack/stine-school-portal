@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}{% if entry %}Edit class{% else %}Add class{% endif %}{% endblock %}
+{% block content %}
+<div class="page-header"><div><h1>{% if entry %}Edit class{% else %}Add class{% endif %}</h1><p>Venue, lecturer and student-group clashes are checked when you save.</p></div></div>
+<div class="card"><form method="post" class="form" novalidate>
+  {% csrf_token %}
+  {% include "partials/form.html" %}
+  <button class="btn" type="submit">Save</button>
+  <a class="btn btn-secondary" href="{% url 'timetable:manage' %}">Cancel</a>
+</form></div>
+{% endblock %}

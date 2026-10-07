@@ -13,7 +13,7 @@ the project brief, with the server — not the browser — enforcing every secur
 | 3 | Authentication & authorization | **Done** — see below |
 | 4 | Student dashboard & profile | **Done** — see below |
 | 5 | Units & registration | **Done** — see below |
-| 6 | Timetable | Not started |
+| 6 | Timetable | **Done** — see below |
 | 7 | Hostels | Not started |
 | 8 | Clubs & societies | Not started |
 | 9 | Requests & transfers | Not started |
@@ -23,6 +23,16 @@ the project brief, with the server — not the browser — enforcing every secur
 
 **This is not yet a usable portal.** The inherited code was audited and several critical issues
 were found; until each feature phase is complete and tested, treat every feature as unfinished.
+
+Phase 6 delivered:
+
+* Personal timetables (students: registered classes; lecturers: teaching) and a public master timetable filterable
+  by department, venue, day and student group.
+* Timetable management for `manage_timetable` holders: classes and venues, with venue, lecturer and student-group
+  clash detection (readable messages; PostgreSQL exclusion constraints as backstop), venue-capacity check against
+  enrolment, locks in the documented order, audit with before/after, and notifications to the lecturer and every
+  registered student on each change.
+* Changing an offering's lecturer updates its timetable entries in the same transaction and re-checks clashes.
 
 Phase 5 delivered:
 

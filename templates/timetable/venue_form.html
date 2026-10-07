@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}{% if venue %}Edit venue{% else %}Add venue{% endif %}{% endblock %}
+{% block content %}
+<div class="page-header"><div><h1>{% if venue %}Edit venue {{ venue.code }}{% else %}Add venue{% endif %}</h1></div></div>
+<div class="card"><form method="post" class="form" novalidate>
+  {% csrf_token %}
+  {% include "partials/form.html" %}
+  <button class="btn" type="submit">Save</button>
+  <a class="btn btn-secondary" href="{% url 'timetable:manage' %}">Cancel</a>
+</form></div>
+{% endblock %}
