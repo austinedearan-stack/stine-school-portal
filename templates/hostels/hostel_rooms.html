@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+{% block title %}{{ hostel.name }} - Rooms & Beds | University Portal{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto space-y-6">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+            <div class="flex items-center space-x-2">
+                <a href="{% url 'hostels:catalog' %}" class="text-xs text-indigo-600 hover:underline">&larr; Back to Hostels</a>
+                <span class="text-xs text-slate-400">/</span>
+                <span class="text-xs text-slate-500 font-mono">{{ hostel.code }}</span>
+            </div>
+            <h1 class="text-2xl font-bold text-slate-900 mt-1">{{ hostel.name }}</h1>
+            <p class="text-sm text-slate-500">{{ hostel.campus }} &bull; Policy: <strong class="text-slate-700">{{ hostel.get_gender_policy_display }}</strong></p>
+        </div>
+    </div>
+
+    <!-- Rooms and Beds List -->
+    <div class="space-y-4">
+        {% for room in rooms %}
+        <div class="bg-white rounded-xl border border-slate-200 shadow-xs p-5">
+            <div class="flex flex-col sm:flex-row justify-between sm:items-center pb-3 border-b border-slate-100 gap-2">
+                <div>
+                    <h3 class="text-base font-bold text-slate-900">
+                        {{ room.building.name }} &bull; Room {{ room.room_number }}
+                    </h3>
+                    <p class="text-xs text-slate-500">Floor {{ room.floor }} &bull; {{ room.get_room_type_display }} (Capacity: {{ room.capacity }})</p>
+                </div>
+                <div>
+                    <span class="text-xs font-semibold px-2.5 py-1 rounded-full
+                        {% if room.available_beds_count > 0 %}bg-emerald-100 text-emerald-800{% else %}bg-slate-100 text-slate-600{% endif %}">
+                        {{ room.available_beds_count }} Available Beds
+                    </span>
+                </div>
+            </div>
+
+            <!-- Beds Grid inside room -->
+            <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                {% for bed in room.beds.all %}
+                <div class="p-3 rounded-lg border flex flex-col justify-between
+                    {% if bed.status == 'AVAILABLE' and not bed.is_occupied %}bg-emerald-50/50 border-emerald-200
+                    {% else %}bg-slate-50 border-slate-200 opacity-75{% endif %}">
+                    <div>
+                        <div class="flex justify-between items-center mb-1">
+                            <span class="font-bold text-sm text-slate-800">Bed {{ bed.bed_number }}</span>
+                            <span class="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded
+                                {% if bed.status == 'AVAILABLE' and not bed.is_occupied %}bg-emerald-200 text-emerald-900
+                                {% else %}bg-slate-200 text-slate-700{% endif %}">
+                                {% if bed.status == 'AVAILABLE' and not bed.is_occupied %}Available{% else %}Occupied{% endif %}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="mt-3 pt-2 border-t border-slate-200/60">
+                        {% if is_student %}
+                            {% if bed.status == 'AVAILABLE' and not bed.is_occupied %}
+                            <form method="POST" action="{% url 'hostels:book_bed' %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="bed_id" value="{{ bed.id }}">
+                                <button type="submit" class="w-full py-1.5 px-3 bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-xs rounded-md shadow-xs cursor-pointer">
+                                    Reserve Bed
+                                </button>
+                            </form>
+                            {% else %}
+                            <button disabled class="w-full py-1.5 px-3 bg-slate-200 text-slate-500 font-medium text-xs rounded-md cursor-not-allowed">
+                                Reserved
+                            </button>
+                            {% endif %}
+                        {% endif %}
+                    </div>
+                </div>
+                {% empty %}
+                <p class="text-xs text-slate-400 italic">No beds configured in this room.</p>
+                {% endfor %}
+            </div>
+        </div>
+        {% empty %}
+        <div class="bg-white p-8 text-center rounded-xl border border-slate-200 text-slate-500">
+            No rooms currently registered under this hostel.
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

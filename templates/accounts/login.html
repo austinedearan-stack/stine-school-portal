@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+{% block title %}Sign In - University Student Information Portal{% endblock %}
+{% block content %}
+<div class="min-h-[75vh] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div class="sm:mx-auto sm:w-full sm:max-w-md">
+        <div class="flex justify-center">
+            <div class="w-14 h-14 bg-indigo-900 rounded-2xl flex items-center justify-center shadow-lg">
+                <svg class="w-8 h-8 text-indigo-300" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a10.978 10.978 0 00-.25 2.399 7 7 0 004 6.326V18a1 1 0 102 0v-1.225a7 7 0 004-6.326c0-.82-.088-1.623-.25-2.399l2.644-1.131a1 1 0 000-1.84l-7-3z" />
+                </svg>
+            </div>
+        </div>
+        <h2 class="mt-4 text-center text-3xl font-extrabold text-slate-900 tracking-tight">University Portal</h2>
+        <p class="mt-2 text-center text-sm text-slate-600">Secure Student & Staff Access</p>
+    </div>
+
+    <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+        <div class="bg-white py-8 px-4 shadow-xl sm:rounded-xl sm:px-10 border border-slate-100">
+            <form method="POST" action="{% url 'accounts:login' %}" class="space-y-6">
+                {% csrf_token %}
+                <div>
+                    <label for="id_identifier" class="block text-sm font-medium text-slate-700">Identification / Email</label>
+                    <div class="mt-1">
+                        {{ form.identifier }}
+                    </div>
+                </div>
+
+                <div>
+                    <div class="flex items-center justify-between">
+                        <label for="id_password" class="block text-sm font-medium text-slate-700">Password</label>
+                        <a href="{% url 'accounts:password_reset_request' %}" class="text-xs text-indigo-600 hover:text-indigo-500 font-medium">Forgot password?</a>
+                    </div>
+                    <div class="mt-1">
+                        {{ form.password }}
+                    </div>
+                </div>
+
+                <div>
+                    <button type="submit" class="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 cursor-pointer">
+                        Authenticate Securely
+                    </button>
+                </div>
+            </form>
+
+            <div class="mt-6 border-t border-slate-200 pt-4 text-center">
+                <p class="text-xs text-slate-500">
+                    Protected by Argon2 hashing, session cycling, and progressive rate limiting.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,1 @@
+# apps.academics package

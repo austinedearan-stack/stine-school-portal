@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+{% block title %}Hostels & Residential Halls - University Portal{% endblock %}
+{% block content %}
+<div class="max-w-7xl mx-auto space-y-6">
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-slate-900">Hostels & Campus Residences</h1>
+            <p class="text-sm text-slate-500">Live booking system with real-time room vacancy and bed allocation.</p>
+        </div>
+        {% if is_student %}
+        <div>
+            <a href="{% url 'hostels:my_hostel' %}" class="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg text-sm shadow-sm">
+                View My Room & Allocation &rarr;
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Active Allocation Alert if applicable -->
+    {% if my_allocation %}
+    <div class="p-4 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <span class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">✓</span>
+            <div>
+                <p class="text-sm font-bold text-emerald-900">You currently hold an active room reservation</p>
+                <p class="text-xs text-emerald-700">
+                    {{ my_allocation.bed.room.building.hostel.name }} &bull; {{ my_allocation.bed.room.building.name }} &bull; Room {{ my_allocation.bed.room.room_number }}, Bed {{ my_allocation.bed.bed_number }}
+                </p>
+            </div>
+        </div>
+        <a href="{% url 'hostels:my_hostel' %}" class="text-xs font-bold text-emerald-800 underline hover:text-emerald-900">Manage Allocation</a>
+    </div>
+    {% endif %}
+
+    <!-- Hostels Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for hostel in hostels %}
+        <div class="bg-white rounded-xl border border-slate-200 shadow-xs p-6 flex flex-col justify-between hover:border-indigo-300 transition">
+            <div>
+                <div class="flex justify-between items-start mb-2">
+                    <span class="text-xs font-mono font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded">{{ hostel.code }}</span>
+                    <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full
+                        {% if hostel.gender_policy == 'MALE' %}bg-blue-100 text-blue-800
+                        {% elif hostel.gender_policy == 'FEMALE' %}bg-pink-100 text-pink-800
+                        {% else %}bg-purple-100 text-purple-800{% endif %}">
+                        {{ hostel.get_gender_policy_display }}
+                    </span>
+                </div>
+                <h3 class="text-lg font-bold text-slate-900 mb-1">{{ hostel.name }}</h3>
+                <p class="text-xs text-slate-500 mb-4">{{ hostel.campus }} &bull; {{ hostel.buildings.count }} Residential Blocks</p>
+
+                <div class="p-3 bg-slate-50 rounded-lg text-xs text-slate-600 mb-4 space-y-1">
+                    <p class="font-semibold text-slate-800">Hall Warden:</p>
+                    <p>{{ hostel.warden_name|default:"Residential Life Staff" }} ({{ hostel.warden_contact|default:"Hostel Office" }})</p>
+                </div>
+
+                <div class="text-xs text-slate-500 mb-4">
+                    <p class="font-semibold text-slate-700 mb-1">Residence Rules:</p>
+                    <p class="italic line-clamp-2">{{ hostel.rules|linebreaksbr }}</p>
+                </div>
+            </div>
+
+            <div class="pt-4 border-t border-slate-100 flex items-center justify-between">
+                <a href="{% url 'hostels:rooms' hostel_code=hostel.code %}" class="w-full text-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg text-sm shadow-xs">
+                    Browse Rooms & Available Beds &rarr;
+                </a>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-span-full bg-white p-12 text-center rounded-xl border border-slate-200 text-slate-500">
+            No active hostels available for booking at this time.
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

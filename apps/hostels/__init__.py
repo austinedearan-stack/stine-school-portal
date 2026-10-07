@@ -1,0 +1,1 @@
+# apps.hostels package
