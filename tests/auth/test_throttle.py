@@ -21,7 +21,7 @@ def _clear_throttle():
     cache.clear()
 
 
-def attempt(client, identifier, password="wrong-password-xyz", ip="203.0.113.10"):
+def attempt(client, identifier, password="wrong-password-xyz", ip="203.0.113.10"):  # secret-scan: allow
     return client.post(LOGIN, {"identifier": identifier, "password": password}, REMOTE_ADDR=ip)
 
 

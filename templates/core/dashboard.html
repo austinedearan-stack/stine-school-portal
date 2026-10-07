@@ -4,10 +4,101 @@
 <div class="page-header">
   <div>
     <h1>Welcome, {{ user.get_short_name }}</h1>
-    <p>{{ user.get_role_display }} · {{ user.username }}</p>
+    <p>{{ user.get_role_display }} · {{ user.username }}{% if semester %} · {{ semester }}{% endif %}</p>
   </div>
 </div>
-<div class="card">
-  <p>Use the menu to open the services available to your account.</p>
-</div>
+
+{% if user.role == "STUDENT" %}
+  {% if not student %}
+    <div class="alert alert-warning">Your student record has not been set up yet. Please contact the registrar.</div>
+  {% else %}
+  <div class="grid grid-4">
+    <div class="stat"><div class="value">{{ registrations|length }}</div><div class="label">Registered units</div></div>
+    <div class="stat"><div class="value">{{ credit_total }}</div><div class="label">Credit hours</div></div>
+    <div class="stat"><div class="value">{{ open_requests|length }}</div><div class="label">Open requests</div></div>
+    <div class="stat"><div class="value">{% if allocation %}{{ allocation.bed.room.number }}{% else %}–{% endif %}</div><div class="label">Hostel room</div></div>
+  </div>
+  <div class="grid grid-2 mt">
+    <section class="card">
+      <h2>My units this semester</h2>
+      {% if registrations %}
+      <div class="table-wrap"><table class="table">
+        <thead><tr><th>Code</th><th>Title</th><th>Credits</th><th>Lecturer</th></tr></thead>
+        <tbody>{% for reg in registrations %}<tr>
+          <td>{{ reg.offering.unit.code }}</td><td>{{ reg.offering.unit.title }}</td>
+          <td>{{ reg.offering.unit.credit_hours }}</td>
+          <td>{{ reg.offering.lecturer.user.full_name|default:"TBA" }}</td></tr>{% endfor %}</tbody>
+      </table></div>
+      {% else %}<p class="empty">You have not registered for any units this semester.</p>{% endif %}
+    </section>
+    <section class="card">
+      <h2>This week</h2>
+      {% for day, entries in week %}
+        <div class="tt-day"><strong>{{ day }}</strong>
+        {% for e in entries %}<div class="tt-slot">{{ e.start_time|time:"H:i" }}–{{ e.end_time|time:"H:i" }} · {{ e.offering.unit.code }} · {{ e.get_class_type_display }} · {{ e.venue.code }}</div>{% endfor %}
+        </div>
+      {% empty %}<p class="empty">No classes scheduled.</p>{% endfor %}
+    </section>
+    <section class="card">
+      <h2>Accommodation</h2>
+      {% if allocation %}
+        <p>{{ allocation.bed }} <span class="badge {% if allocation.status == 'ACTIVE' %}badge-ok{% else %}badge-warn{% endif %}">{{ allocation.get_status_display }}</span></p>
+      {% else %}<p class="empty">No hostel allocation this semester.</p>{% endif %}
+    </section>
+    <section class="card">
+      <h2>Open requests</h2>
+      {% for req in open_requests %}<p><span class="mono">{{ req.number }}</span> {{ req.subject }} <span class="badge badge-info">{{ req.get_status_display }}</span></p>
+      {% empty %}<p class="empty">No open requests.</p>{% endfor %}
+    </section>
+  </div>
+  {% endif %}
+
+{% elif user.role == "STAFF" %}
+  <div class="grid grid-2">
+    <section class="card">
+      <h2>My teaching this semester</h2>
+      {% if offerings %}
+      <div class="table-wrap"><table class="table">
+        <thead><tr><th>Unit</th><th>Section</th><th>Enrolled</th><th>Capacity</th></tr></thead>
+        <tbody>{% for o in offerings %}<tr><td>{{ o.unit.code }} {{ o.unit.title }}</td><td>{{ o.section }}</td><td>{{ o.enrolled }}</td><td>{{ o.capacity }}</td></tr>{% endfor %}</tbody>
+      </table></div>
+      {% else %}<p class="empty">You are not assigned to any offerings this semester.</p>{% endif %}
+    </section>
+    <section class="card">
+      <h2>This week</h2>
+      {% for day, entries in week %}
+        <div class="tt-day"><strong>{{ day }}</strong>
+        {% for e in entries %}<div class="tt-slot">{{ e.start_time|time:"H:i" }}–{{ e.end_time|time:"H:i" }} · {{ e.offering.unit.code }} · {{ e.venue.code }}</div>{% endfor %}
+        </div>
+      {% empty %}<p class="empty">No classes scheduled.</p>{% endfor %}
+    </section>
+    <section class="card">
+      <h2>Requests assigned to me</h2>
+      {% for req in assigned_requests %}<p><span class="mono">{{ req.number }}</span> {{ req.subject }} <span class="badge badge-info">{{ req.get_status_display }}</span></p>
+      {% empty %}<p class="empty">Nothing assigned to you.</p>{% endfor %}
+    </section>
+  </div>
+
+{% else %}
+  {% if stats %}
+  <div class="grid grid-4">
+    <div class="stat"><div class="value">{{ stats.students }}</div><div class="label">Active students</div></div>
+    <div class="stat"><div class="value">{{ stats.staff }}</div><div class="label">Active staff</div></div>
+    <div class="stat"><div class="value">{{ stats.registrations }}</div><div class="label">Unit registrations</div></div>
+    <div class="stat"><div class="value">{{ stats.open_requests }}</div><div class="label">Open requests</div></div>
+    <div class="stat"><div class="value">{{ stats.beds_held }} / {{ stats.beds }}</div><div class="label">Beds allocated</div></div>
+  </div>
+  {% endif %}
+  <section class="card mt">
+    <h2>Your access</h2>
+    {% if capabilities %}<p>{% for c in capabilities %}<span class="badge">{{ c }}</span> {% endfor %}</p>
+    {% else %}<p class="empty">No administrative capabilities have been granted to your account yet.</p>{% endif %}
+  </section>
+{% endif %}
+
+<section class="card">
+  <h2>Recent notifications</h2>
+  {% for n in notifications %}<p>{% if not n.read_at %}<span class="badge badge-info">new</span> {% endif %}<strong>{{ n.title }}</strong> <span class="muted small">{{ n.created_at|timesince }} ago</span><br><span class="small">{{ n.body }}</span></p>
+  {% empty %}<p class="empty">No notifications.</p>{% endfor %}
+</section>
 {% endblock %}

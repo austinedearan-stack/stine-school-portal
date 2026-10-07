@@ -7,8 +7,10 @@ from django.views.decorators.http import require_GET
 
 @login_required
 def dashboard_view(request):
-    """Role-aware landing page. Identity comes only from the session (request.user)."""
-    return render(request, "core/dashboard.html", {})
+    """Role-aware landing page. Everything shown is selected for request.user only."""
+    from apps.core.dashboard import dashboard_context
+
+    return render(request, "core/dashboard.html", dashboard_context(request.user))
 
 
 # ==========================================

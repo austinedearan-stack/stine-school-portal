@@ -11,11 +11,31 @@ the project brief, with the server — not the browser — enforcing every secur
 | 1 | Architecture, requirements, foundation hardening | **Done** — see below |
 | 2 | Models & migrations (schema of `DATABASE.md`) | **Done** — see below |
 | 3 | Authentication & authorization | **Done** — see below |
-| 4–11 | Feature modules | Not started (inherited views exist; many render missing templates) |
+| 4 | Student dashboard & profile | **Done** — see below |
+| 5 | Units & registration | Not started |
+| 6 | Timetable | Not started |
+| 7 | Hostels | Not started |
+| 8 | Clubs & societies | Not started |
+| 9 | Requests & transfers | Not started |
+| 10 | Admin panel | Not started |
+| 11 | Notifications & announcements | Not started |
 | 12–15 | Hardening, testing, adversarial testing, deployment | Not started |
 
 **This is not yet a usable portal.** The inherited code was audited and several critical issues
 were found; until each feature phase is complete and tested, treat every feature as unfinished.
+
+Phase 4 delivered:
+
+* Role-aware dashboards built only from the signed-in user's data (student: units, week timetable, hostel,
+  open requests; lecturer: teaching and assigned requests; admin: capabilities and, with `view_statistics`, statistics).
+* Profile pages: institutional fields read-only; students edit contact/emergency fields and staff edit office/phone
+  through explicit allowlists (mass assignment refused); every change audited with before/after.
+* Secure upload pipeline (`apps/core/files.py`): content-sniffed types matched to the extension, size limits on the
+  real content, image decode + re-encode (EXIF and polyglot payloads removed, pixel bombs refused), PDF active-content
+  rejection including compressed streams, random storage names, optional malware-scanner hook, authorized downloads
+  with safe `Content-Disposition`, `nosniff` and a sandbox CSP. Profile photos use it.
+* Student privacy (audit Z-3): students see only themselves; lecturers see name/ID/program of students in their own
+  offerings and no contact details; full records need `manage_students`. Out-of-scope lookups return 404 and are recorded.
 
 Phase 3 delivered:
 

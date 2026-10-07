@@ -197,6 +197,13 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_ROOT = Path(env_str("PRIVATE_MEDIA_ROOT", str(BASE_DIR / "var" / "private-media")))
 MEDIA_URL = "/private-media-not-served/"
 
+MAX_PROFILE_PHOTO_BYTES = 2 * 1024 * 1024
+MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024
+# Optional malware scanner: dotted path to a callable(bytes) -> bool (True = clean). Off unless configured.
+PRIVATE_FILE_SCANNER = env_str("PRIVATE_FILE_SCANNER", "")
+# When set (production behind Nginx), downloads are delegated with X-Accel-Redirect to this internal location.
+PRIVATE_FILES_X_ACCEL_PREFIX = env_str("PRIVATE_FILES_X_ACCEL_PREFIX", "")
+
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
     "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},

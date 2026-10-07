@@ -156,3 +156,4 @@ select[multiple] { min-height: 8rem; }
 
 /* Pagination */
 .pagination { display: flex; gap: .4rem; align-items: center; margin-top: 1rem; }
+.mt { margin-top: 1.25rem; }

@@ -70,3 +70,23 @@ def deny(actor, action: str, obj=None, *, ctx=None, reason: str = "") -> None:
     )
     record_denial(actor if is_active_user(actor) else None, f"DENIED.{action}", obj, ctx=ctx, reason=reason)
     raise PermissionDenied("You do not have permission to perform this action.")
+
+
+def get_in_scope_or_404(actor, action: str, queryset, *, ctx=None, **lookup):
+    """Fetch one object and authorize ``action`` on it; anything outside the actor's scope is a 404.
+
+    Out-of-scope objects get the same response as non-existent ones (no existence probing, §1.3 rule 5);
+    the attempt is still recorded as a denial.
+    """
+    from django.http import Http404
+
+    obj = queryset.filter(**lookup).first()
+    if obj is None:
+        raise Http404
+    if not is_allowed(actor, action, obj):
+        try:
+            deny(actor, action, obj, ctx=ctx, reason="out_of_scope")
+        except PermissionDenied:
+            pass
+        raise Http404
+    return obj

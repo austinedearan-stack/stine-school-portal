@@ -21,7 +21,7 @@ lands (see `ARCHITECTURE.md` §9). ✅ = fixed in Phase 1 with a regression test
 | S-3 | ~20 views render templates that do not exist (`requests/*`, `administration/*`, `notifications/*`, `clubs/club_detail.html`, …) → HTTP 500. | 4–11 |
 | S-4 | `apps/requests` is placed on `sys.path` via `sys.path.insert(0, BASE_DIR/'apps')`, so `import requests` anywhere in the process resolves to the portal app instead of the PyPI `requests` library (breaks third-party code; confusing import semantics). | ✅ 1 (app renamed `student_requests`, hack removed) |
 | S-5 | Pinned to `Django>=5.0,<5.2`; Django 5.0 and 5.1 are end-of-life. `gunicorn` is used by the Dockerfile but is not in `requirements.txt`. Dependencies unpinned. | ✅ 1 (Django 5.2 LTS, pinned) |
-| S-6 | Many views swallow every exception (`except Exception: pass`), hiding real defects. | 4–11 |
+| S-6 | Many views swallow every exception (`except Exception: pass`), hiding real defects. | 🟡 4 (live code clean; the still-unmounted inherited academics/hostels views are replaced in 5 and 7) |
 | S-7 | Role checks are string comparisons scattered across views (`request.user.role != 'STUDENT'`) rather than the central policy layer the spec requires. | ✅ 3 |
 | S-8 | **Admins can never finish logging in.** `mfa_verify_view` returns the tuple from `complete_user_login()` instead of an HTTP response, so the correct TOTP code crashes the request (`TypeError`) after the session is already logged in (found by runtime probe). | ✅ 3 |
 | S-9 | First-time MFA enrollment calls `verify_totp()` on an unsaved throw-away `User`, which **inserts a blank, active STUDENT account** (username `''`) on every enrollment; the second admin to enroll then hits a unique-constraint error (found by runtime probe). | ✅ 3 |
@@ -48,7 +48,7 @@ lands (see `ARCHITECTURE.md` §9). ✅ = fixed in Phase 1 with a regression test
 |----|-----|---------|-------|
 | Z-1 | H | `announcement_detail_view` returns any published announcement by UUID with no audience check (department/staff-only announcements readable by any user). | 11 |
 | Z-2 | H | Student announcement filter uses `Q(department=…)` without `audience`, so **staff-only** announcements scoped to a department leak to that department's students. | 11 |
-| Z-3 | H | `can_view_student` lets *every* staff member view *every* student, including phone and emergency contacts (violates least privilege / spec §26). | 3 |
+| Z-3 | H | `can_view_student` lets *every* staff member view *every* student, including phone and emergency contacts (violates least privilege / spec §26). | ✅ 4 |
 | Z-4 | H | Admin request panel: new status is taken verbatim from POST (`ticket.status = new_status`) — no allowlist, no state machine; `assigned_to` accepts any staff id. | 9–10 |
 | Z-5 | H | Approved transfers can be "executed" repeatedly, outside a transaction, regardless of transfer type. | 9 |
 | Z-6 | M | All ADMINs have all admin powers (`role_required(ADMIN, SUPERADMIN)`), no granular permissions (spec §34). | ✅ 3 |
@@ -62,8 +62,8 @@ lands (see `ARCHITECTURE.md` §9). ✅ = fixed in Phase 1 with a regression test
 | ID | Sev | Finding | Phase |
 |----|-----|---------|-------|
 | F-1 | H | In DEBUG, all of `MEDIA_ROOT` (request attachments, profile photos) is served publicly by `static()` with **no authorization**; no protected-download design exists for production. | ✅ 1 (public media serving removed); protected downloads 9 |
-| F-2 | M | `Content-Disposition` built by string-formatting the user-supplied original filename (header injection / broken header). | 9 |
-| F-3 | M | Image uploads are not decoded/re-encoded (polyglot files survive); PDFs not inspected for active content. | 9 |
+| F-2 | M | `Content-Disposition` built by string-formatting the user-supplied original filename (header injection / broken header). | ✅ 4 (pipeline in `apps/core/files.py`; request attachments use it in 9) |
+| F-3 | M | Image uploads are not decoded/re-encoded (polyglot files survive); PDFs not inspected for active content. | ✅ 4 (pipeline in `apps/core/files.py`; request attachments use it in 9) |
 | F-4 | L | Transfer ticket numbers are `TRF-<year>-<4 random digits>` → collisions raise IntegrityError (500) after a few thousand requests; predictable identifiers used in URLs. | 9 |
 
 ## 5. Infrastructure / configuration

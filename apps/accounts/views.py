@@ -11,7 +11,7 @@ import qrcode
 from django.contrib import messages
 from django.contrib.auth import logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.http import HttpResponse
 from django.shortcuts import redirect, render
@@ -30,13 +30,11 @@ from apps.accounts.forms import (
     PasswordResetConfirmForm,
     PasswordResetRequestForm,
     ReauthForm,
-    StudentProfileEditForm,
     TotpConfirmForm,
 )
 from apps.accounts.models import UserSession
 from apps.accounts.services import LoginOutcome, attempt_login, finish_login, resolve_identifier, safe_next_url
 from apps.core.audit import record_audit_event, record_security_event
-from apps.core.capabilities import Role
 from apps.core.context import RequestContext
 from apps.core.crypto import decrypt, encrypt
 from apps.core.models import SecurityEventType
@@ -465,32 +463,3 @@ def password_reset_confirm_view(request):
                 return limiter_down(request)
             form.add_error("code", "That code is not valid or has expired.")
     return render(request, "accounts/password_reset_confirm.html", {"form": form})
-
-
-# --- Profile (expanded in Phase 4) ----------------------------------------------------------------
-
-
-@login_required
-def profile_view(request):
-    user = request.user
-    return render(request, "accounts/profile.html", {
-        "profile_user": user,
-        "student": getattr(user, "student_profile", None) if user.role == Role.STUDENT else None,
-        "staff": getattr(user, "staff_profile", None),
-    })
-
-
-@login_required
-@require_http_methods(["GET", "POST"])
-def edit_student_profile_view(request):
-    if request.user.role != Role.STUDENT or not hasattr(request.user, "student_profile"):
-        raise PermissionDenied("Only students have a student profile.")
-    student = request.user.student_profile
-    form = StudentProfileEditForm(request.POST or None, instance=student)
-    if request.method == "POST" and form.is_valid():
-        form.save()
-        record_audit_event(request.user, "PROFILE.UPDATED", student, ctx=RequestContext.from_request(request),
-                           changes={"fields": sorted(form.changed_data)})
-        messages.success(request, "Profile updated.")
-        return redirect("accounts:profile")
-    return render(request, "accounts/edit_profile.html", {"form": form, "student": student})

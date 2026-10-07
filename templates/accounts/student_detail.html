@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}{{ student.user.full_name }}{% endblock %}
+{% block content %}
+<div class="page-header"><div><h1>{{ student.user.full_name }}</h1><p>{{ student.student_number }} · {{ student.program.name }}</p></div></div>
+<div class="grid grid-2">
+  <section class="card">
+    <h2>Student</h2>
+    <dl class="details">
+      <dt>Student number</dt><dd>{{ student.student_number }}</dd>
+      <dt>Name</dt><dd>{{ student.user.full_name }}</dd>
+      <dt>Program</dt><dd>{{ student.program.name }} ({{ student.program.code }})</dd>
+      <dt>Year of study</dt><dd>{{ student.year_of_study }}</dd>
+      {% if show_institutional %}
+      <dt>Institutional email</dt><dd>{{ student.user.email }}</dd>
+      <dt>Campus</dt><dd>{{ student.campus }}</dd>
+      <dt>Academic status</dt><dd>{{ student.get_academic_status_display }}</dd>
+      <dt>Disciplinary status</dt><dd>{{ student.get_disciplinary_status_display }}</dd>
+      <dt>Admitted</dt><dd>{{ student.admission_date|date:"j M Y" }}</dd>
+      {% endif %}
+    </dl>
+  </section>
+  {% if show_contacts %}
+  <section class="card">
+    <h2>Contact details</h2>
+    <dl class="details">
+      <dt>Phone</dt><dd>{{ student.phone|default:"–" }}</dd>
+      <dt>Personal email</dt><dd>{{ student.personal_email|default:"–" }}</dd>
+      <dt>Emergency contact</dt><dd>{{ student.emergency_contact_name|default:"–" }} {{ student.emergency_contact_phone }}</dd>
+    </dl>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

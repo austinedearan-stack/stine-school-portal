@@ -80,3 +80,44 @@ def can_change_roles(actor, target) -> bool:
 @policy("can_view_own_profile")
 def can_view_own_profile(actor, obj=None) -> bool:
     return True
+
+
+# --- Students & profiles (audit Z-3: least privilege for student data) ------------------------------
+
+
+def _staff_teaches_student(actor, student) -> bool:
+    from apps.academics.models import LIVE_REGISTRATION_STATUSES, UnitRegistration
+
+    staff = getattr(actor, "staff_profile", None)
+    if actor.role != Role.STAFF or staff is None:
+        return False
+    return UnitRegistration.objects.filter(
+        student=student, offering__lecturer=staff, status__in=LIVE_REGISTRATION_STATUSES
+    ).exists()
+
+
+@policy("can_view_student")
+def can_view_student(actor, student) -> bool:
+    """Own record; holders of manage_students; a lecturer for students in their own offerings (limited fields)."""
+    if student is None:
+        return has_capability(actor, "manage_students")
+    if student.user_id == actor.pk:
+        return True
+    return has_capability(actor, "manage_students") or _staff_teaches_student(actor, student)
+
+
+@policy("can_view_student_contacts")
+def can_view_student_contacts(actor, student) -> bool:
+    """Phone, personal email, emergency contacts: the student and manage_students holders only."""
+    return student.user_id == actor.pk or has_capability(actor, "manage_students")
+
+
+@policy("can_edit_student_profile")
+def can_edit_student_profile(actor, student) -> bool:
+    """Only the student, and only the student-editable contact fields (enforced by the form allowlist)."""
+    return actor.role == Role.STUDENT and student.user_id == actor.pk
+
+
+@policy("can_view_profile_photo")
+def can_view_profile_photo(actor, stored_file) -> bool:
+    return stored_file.owner_id == actor.pk or has_capability(actor, "manage_students")

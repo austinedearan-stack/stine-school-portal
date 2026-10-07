@@ -1,133 +1,67 @@
-{% extends 'base.html' %}
-{% block title %}My Profile - University Student Portal{% endblock %}
+{% extends "base.html" %}
+{% block title %}My profile{% endblock %}
 {% block content %}
-<div class="max-w-5xl mx-auto space-y-6">
-    <!-- Header Banner -->
-    <div class="bg-white shadow-sm rounded-xl border border-slate-200 p-6 flex flex-col md:flex-row items-center md:items-start space-y-4 md:space-y-0 md:space-x-6">
-        <div class="relative">
-            {% if student and student.profile_photo %}
-            <img src="{{ student.profile_photo.url }}" alt="Profile Photo" class="w-28 h-28 rounded-full object-cover border-4 border-indigo-100 shadow-sm">
-            {% else %}
-            <div class="w-28 h-28 rounded-full bg-indigo-800 text-white flex items-center justify-center text-3xl font-bold border-4 border-indigo-100 shadow-sm">
-                {{ profile_user.username|slice:":2"|upper }}
-            </div>
-            {% endif %}
-        </div>
-        <div class="flex-1 text-center md:text-left">
-            <h1 class="text-2xl font-bold text-slate-900">{{ profile_user.full_name }}</h1>
-            <p class="text-sm text-slate-500 font-mono">{{ profile_user.username }} &bull; {{ profile_user.email }}</p>
-            <div class="mt-2 flex flex-wrap justify-center md:justify-start gap-2">
-                <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase bg-indigo-100 text-indigo-800">
-                    {{ profile_user.get_role_display }}
-                </span>
-                {% if student %}
-                <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold
-                    {% if student.academic_status == 'ACTIVE' %}bg-emerald-100 text-emerald-800
-                    {% elif student.academic_status == 'PROBATION' %}bg-amber-100 text-amber-800
-                    {% else %}bg-slate-100 text-slate-800{% endif %}">
-                    {{ student.get_academic_status_display }}
-                </span>
-                {% endif %}
-            </div>
-        </div>
-        {% if student %}
-        <div>
-            <a href="{% url 'accounts:edit_profile' %}" class="inline-flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg shadow-sm">
-                Edit Contact Details
-            </a>
-        </div>
-        {% endif %}
-    </div>
-
-    {% if student %}
-    <!-- Student Information Panels -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <!-- Institutional Record (Read-Only) -->
-        <div class="bg-white shadow-sm rounded-xl border border-slate-200 p-6">
-            <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
-                <h3 class="text-base font-bold text-slate-900 flex items-center">
-                    <svg class="w-4 h-4 mr-2 text-slate-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/></svg>
-                    Institutional Records (Read-Only)
-                </h3>
-                <span class="text-xs text-slate-400">Maintained by Registrar</span>
-            </div>
-            <dl class="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2 text-sm">
-                <div>
-                    <dt class="font-medium text-slate-500">Student ID</dt>
-                    <dd class="mt-1 font-semibold text-slate-900 font-mono">{{ student.student_id }}</dd>
-                </div>
-                <div>
-                    <dt class="font-medium text-slate-500">Degree Program</dt>
-                    <dd class="mt-1 text-slate-900">{{ student.program.name }} ({{ student.program.code }})</dd>
-                </div>
-                <div>
-                    <dt class="font-medium text-slate-500">Department</dt>
-                    <dd class="mt-1 text-slate-900">{{ student.program.department.name }}</dd>
-                </div>
-                <div>
-                    <dt class="font-medium text-slate-500">Faculty / School</dt>
-                    <dd class="mt-1 text-slate-900">{{ student.program.department.faculty.name }}</dd>
-                </div>
-                <div>
-                    <dt class="font-medium text-slate-500">Academic Year / Term</dt>
-                    <dd class="mt-1 text-slate-900">Year {{ student.current_year }}, Semester {{ student.current_semester }}</dd>
-                </div>
-                <div>
-                    <dt class="font-medium text-slate-500">Admission Date</dt>
-                    <dd class="mt-1 text-slate-900">{{ student.admission_date|date:"F d, Y" }}</dd>
-                </div>
-                <div>
-                    <dt class="font-medium text-slate-500">Gender</dt>
-                    <dd class="mt-1 text-slate-900">{{ student.get_gender_display }}</dd>
-                </div>
-            </dl>
-        </div>
-
-        <!-- Student-Editable Contact Info -->
-        <div class="bg-white shadow-sm rounded-xl border border-slate-200 p-6">
-            <div class="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
-                <h3 class="text-base font-bold text-slate-900">Contact & Emergency Information</h3>
-                <span class="text-xs text-indigo-600 font-medium">Self-Manageable</span>
-            </div>
-            <dl class="grid grid-cols-1 gap-x-4 gap-y-4 text-sm">
-                <div>
-                    <dt class="font-medium text-slate-500">Personal Phone Number</dt>
-                    <dd class="mt-1 text-slate-900">{{ student.phone|default:"Not specified" }}</dd>
-                </div>
-                <div>
-                    <dt class="font-medium text-slate-500">Emergency Contact</dt>
-                    <dd class="mt-1 text-slate-900 font-semibold">{{ student.emergency_contact_name|default:"Not specified" }}</dd>
-                    <dd class="text-xs text-slate-500">{{ student.emergency_contact_relationship }} &bull; {{ student.emergency_contact_phone }}</dd>
-                </div>
-            </dl>
-            <div class="mt-6 pt-4 border-t border-slate-100 flex justify-end">
-                <a href="{% url 'accounts:edit_profile' %}" class="text-xs font-semibold text-indigo-600 hover:text-indigo-700">Update Contact Details &rarr;</a>
-            </div>
-        </div>
-    </div>
-    {% elif staff %}
-    <!-- Staff Profile Information -->
-    <div class="bg-white shadow-sm rounded-xl border border-slate-200 p-6">
-        <h3 class="text-base font-bold text-slate-900 mb-4">Staff Academic Appointment</h3>
-        <dl class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-            <div>
-                <dt class="font-medium text-slate-500">Staff Identification</dt>
-                <dd class="font-semibold text-slate-900 font-mono">{{ staff.staff_id }}</dd>
-            </div>
-            <div>
-                <dt class="font-medium text-slate-500">Academic Title</dt>
-                <dd class="text-slate-900">{{ staff.title }}</dd>
-            </div>
-            <div>
-                <dt class="font-medium text-slate-500">Department</dt>
-                <dd class="text-slate-900">{{ staff.department.name }}</dd>
-            </div>
-            <div>
-                <dt class="font-medium text-slate-500">Office Room</dt>
-                <dd class="text-slate-900">{{ staff.office_room|default:"General Faculty Hall" }}</dd>
-            </div>
-        </dl>
-    </div>
-    {% endif %}
+<div class="page-header">
+  <div><h1>{{ profile_user.full_name }}</h1><p>{{ profile_user.get_role_display }} · {{ profile_user.username }} · {{ profile_user.email }}</p></div>
+  <div class="row">
+    {% if student or staff %}<a class="btn" href="{% url 'accounts:edit_profile' %}">Edit contact details</a>{% endif %}
+    <a class="btn btn-secondary" href="{% url 'accounts:security' %}">Account security</a>
+  </div>
 </div>
+
+{% if student %}
+<div class="grid grid-2">
+  <section class="card">
+    <h2>Academic record</h2>
+    <p class="small muted">Managed by the registrar. Contact the registrar to correct any of these details.</p>
+    <dl class="details">
+      <dt>Student number</dt><dd>{{ student.student_number }}</dd>
+      <dt>Program</dt><dd>{{ student.program.name }} ({{ student.program.code }})</dd>
+      <dt>Department</dt><dd>{{ student.program.department.name }}</dd>
+      <dt>Faculty</dt><dd>{{ student.program.department.faculty.name }}</dd>
+      <dt>Year of study</dt><dd>{{ student.year_of_study }}</dd>
+      <dt>Semester</dt><dd>{{ student.current_semester_number }}</dd>
+      <dt>Campus</dt><dd>{{ student.campus }}</dd>
+      <dt>Admitted</dt><dd>{{ student.admission_date|date:"j M Y" }}</dd>
+      <dt>Expected graduation</dt><dd>{{ student.expected_graduation|date:"M Y"|default:"–" }}</dd>
+      <dt>Academic status</dt><dd><span class="badge">{{ student.get_academic_status_display }}</span></dd>
+      <dt>Disciplinary status</dt><dd><span class="badge">{{ student.get_disciplinary_status_display }}</span></dd>
+    </dl>
+  </section>
+  <section class="card">
+    <h2>Photo</h2>
+    {% if student.photo_id %}
+      <img class="qr" src="{% url 'accounts:photo' student.photo_id %}" alt="Your profile photo" width="160">
+      <form method="post" action="{% url 'accounts:photo_remove' %}">{% csrf_token %}<button class="btn btn-secondary btn-small" type="submit">Remove photo</button></form>
+    {% else %}<p class="muted">No photo uploaded.</p>{% endif %}
+    <form method="post" action="{% url 'accounts:photo_upload' %}" enctype="multipart/form-data" class="form mt">
+      {% csrf_token %}
+      {% with form=photo_form %}{% include "partials/form.html" %}{% endwith %}
+      <button class="btn" type="submit">Upload photo</button>
+    </form>
+  </section>
+  <section class="card">
+    <h2>Contact details</h2>
+    <dl class="details">
+      <dt>Phone</dt><dd>{{ student.phone|default:"–" }}</dd>
+      <dt>Personal email</dt><dd>{{ student.personal_email|default:"–" }}</dd>
+      <dt>Emergency contact</dt><dd>{{ student.emergency_contact_name|default:"–" }}{% if student.emergency_contact_relationship %} ({{ student.emergency_contact_relationship }}){% endif %}</dd>
+      <dt>Emergency phone</dt><dd>{{ student.emergency_contact_phone|default:"–" }}</dd>
+    </dl>
+  </section>
+</div>
+{% elif staff %}
+<div class="grid grid-2">
+  <section class="card">
+    <h2>Staff record</h2>
+    <dl class="details">
+      <dt>Staff number</dt><dd>{{ staff.staff_number }}</dd>
+      <dt>Title</dt><dd>{{ staff.title|default:"–" }}</dd>
+      <dt>Department</dt><dd>{{ staff.department.name }}</dd>
+      <dt>Office</dt><dd>{{ staff.office|default:"–" }}</dd>
+      <dt>Phone</dt><dd>{{ staff.phone|default:"–" }}</dd>
+    </dl>
+  </section>
+</div>
+{% endif %}
 {% endblock %}

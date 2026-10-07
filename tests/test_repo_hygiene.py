@@ -64,3 +64,12 @@ def test_no_csrf_exempt_or_raw_sql_in_apps():
 def test_no_safe_filter_in_templates():
     offenders = [str(p.relative_to(ROOT)) for p in (ROOT / "templates").rglob("*.html") if "|safe" in p.read_text()]
     assert offenders == []
+
+
+def test_templates_have_no_inline_script_or_style():
+    """The CSP forbids inline script and style; keep templates compatible (no handlers, no style attributes)."""
+    import re
+
+    pattern = re.compile(r"<script(?![^>]*\bsrc=)|\son[a-z]+\s*=|\sstyle\s*=|<style", re.IGNORECASE)
+    offenders = [str(p.relative_to(ROOT)) for p in (ROOT / "templates").rglob("*.html") if pattern.search(p.read_text())]
+    assert offenders == []

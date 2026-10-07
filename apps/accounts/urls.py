@@ -1,6 +1,6 @@
 from django.urls import path
 
-from apps.accounts import views
+from apps.accounts import profile_views, views
 
 app_name = "accounts"
 
@@ -18,6 +18,10 @@ urlpatterns = [
     path("password/change/", views.password_change_view, name="password_change"),
     path("password/reset/", views.password_reset_request_view, name="password_reset_request"),
     path("password/reset/confirm/", views.password_reset_confirm_view, name="password_reset_confirm"),
-    path("profile/", views.profile_view, name="profile"),
-    path("profile/edit/", views.edit_student_profile_view, name="edit_profile"),
+    path("profile/", profile_views.profile_view, name="profile"),
+    path("profile/edit/", profile_views.profile_edit_view, name="edit_profile"),
+    path("profile/photo/", profile_views.photo_upload_view, name="photo_upload"),
+    path("profile/photo/remove/", profile_views.photo_remove_view, name="photo_remove"),
+    path("photos/<uuid:file_id>/", profile_views.photo_view, name="photo"),
+    path("students/<uuid:student_id>/", profile_views.student_detail_view, name="student_detail"),
 ]

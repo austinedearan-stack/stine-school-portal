@@ -4,7 +4,7 @@ from django import forms
 from django.contrib.auth.password_validation import password_validators_help_texts, validate_password
 from django.core.exceptions import ValidationError
 
-from apps.accounts.models import StudentProfile
+from apps.accounts.models import StaffProfile, StudentProfile
 
 
 class LoginForm(forms.Form):
@@ -127,3 +127,18 @@ class StudentProfileEditForm(forms.ModelForm):
             "emergency_contact_phone",
             "emergency_contact_relationship",
         ]
+
+
+class StaffContactForm(forms.ModelForm):
+    """Staff edit only their office and phone; title and department are institutional."""
+
+    class Meta:
+        model = StaffProfile
+        fields = ["office", "phone"]
+
+
+class PhotoUploadForm(forms.Form):
+    photo = forms.FileField(
+        label="Profile photo", help_text="JPEG or PNG, up to 2 MB. The image is re-processed before it is stored.",
+        widget=forms.ClearableFileInput(attrs={"accept": "image/jpeg,image/png"}),
+    )

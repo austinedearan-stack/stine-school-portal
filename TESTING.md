@@ -58,6 +58,14 @@ Markers: `postgres` (requires PostgreSQL — skipped on SQLite), `slow`.
 * `tests/helpers.py`: `login()` builds a session that passes the session policy (auth time, activity, MFA stamp);
   `enrol()` gives a user a confirmed authenticator; `totp_code()` generates codes for a given time-step.
 
+## Phase 4 results (2026-10-08)
+
+* 209 passed, 2 skipped (PostgreSQL-only) on SQLite. New suites in `tests/profile/`: upload pipeline (22),
+  profile editing / photo access / student privacy (13), dashboards (4); template hygiene test for CSP
+  compatibility (no inline script, event handlers or style attributes).
+* Manual check in a browser against a local development server with seeded fake data: sign-in, student dashboard
+  and profile render with the self-hosted stylesheet and no CSP violations in the console.
+
 ## Required categories (spec §35) — coverage plan
 
 | Category | Phase(s) |
