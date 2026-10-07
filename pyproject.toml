@@ -25,5 +25,14 @@ skips = ["B101"]
 
 [tool.coverage.run]
 source = ["apps", "portal_config"]
-omit = ["*/migrations/*", "*/tests/*"]
+# Entry points and the dev/production settings are exercised in subprocesses (tests/settings), which coverage
+# does not trace; they are excluded here rather than counted as untested.
+omit = ["*/migrations/*", "*/tests/*", "portal_config/asgi.py", "portal_config/wsgi.py",
+        "portal_config/settings/collectstatic.py", "portal_config/settings/development.py",
+        "portal_config/settings/production.py"]
 branch = true
+
+[tool.coverage.report]
+fail_under = 88
+skip_covered = true
+show_missing = true

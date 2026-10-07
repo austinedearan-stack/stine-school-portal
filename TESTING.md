@@ -22,8 +22,9 @@ check → pytest on PostgreSQL 16 with coverage → `check --deploy` with produc
 | `tests/test_repo_hygiene.py` | secret scan, forbidden patterns (`csrf_exempt`, raw SQL, `mark_safe`, `|safe`) |
 | `tests/models/` | Phase 2: DB constraints (check / unique / partial unique / exclusion), append-only ORM guard + DB triggers, capability catalog and role ceilings, seed command |
 | `tests/factories.py` | plain-function builders for fake test data (shared by every suite) |
-| `apps/<app>/tests/` | unit/integration tests per app (feature phases) |
-| `tests/authz_matrix/`, `tests/races/` | authorization matrix and PostgreSQL concurrency suites (Phases 3, 5, 7) |
+| `tests/authz_matrix/` | role × page authorization matrix (ARCHITECTURE.md §5.3) |
+| `tests/academics/`, `tests/timetable/`, `tests/hostels/`, `tests/clubs/`, `tests/requests/`, `tests/notifications/`, `tests/administration/` | feature suites incl. PostgreSQL race tests (`*_race*.py`) |
+| `tests/ui/`, `tests/api/` | end-to-end UI flows; JSON API |
 
 Markers: `postgres` (requires PostgreSQL — skipped on SQLite), `slow`.
 
@@ -130,12 +131,44 @@ Markers: `postgres` (requires PostgreSQL — skipped on SQLite), `slow`.
   chaining, grace window, edited / deleted / replaced rows detected after bypassing the triggers), URL sweep for
   anonymous users and for students on administrative pages; template hygiene (no inline script/style).
 
-## Required categories (spec §35) — coverage plan
+## Phase 13 results (2026-10-08)
 
-| Category | Phase(s) |
+* 640 passed, 9 skipped (PostgreSQL-only) on SQLite; 89.8 % branch coverage.
+* New: `tests/authz_matrix/` (232), `tests/security/test_injection_xss_csrf.py` (12), `tests/ui/test_flows.py` (7 end-to-end
+  flows), `tests/api/` (9), `tests/test_commands_and_scopes.py` (9).
+* Fixed while writing the suite: the URL sweep now distinguishes the JSON API (403) from pages (login redirect).
+
+## Required categories (spec §35) — where each is tested
+
+| Category | Suites |
 |---|---|
-| Unit: models, validators, services, permissions | 2, 3, 5–11 |
-| Integration: auth, registration, unit registration, hostel booking, requests, transfers | 3, 5, 7, 9 |
-| Authorization: cross-student, student→admin, staff→admin-only, admin→superadmin-only | 3 + every feature phase |
-| Security: SQLi, XSS, CSRF, IDOR, privilege escalation, path traversal, malicious upload, brute force, session invalidation | 1 (partial), 3, 9, 13 |
-| Race conditions: simultaneous bed booking / unit registration (PostgreSQL, threads + barriers) | 5, 7 |
+| Unit: models and constraints | `tests/models/` (check / unique / partial unique / exclusion constraints, append-only guard, capability catalog) |
+| Unit: validators | password validators (`tests/auth/test_sessions_and_passwords.py`), upload validation (`tests/profile/test_uploads.py`), form allowlists (feature suites) |
+| Unit: services | `tests/academics/`, `tests/timetable/`, `tests/hostels/`, `tests/clubs/`, `tests/requests/`, `tests/notifications/`, `tests/administration/` |
+| Unit: permissions | `tests/auth/test_authz.py`, `tests/models/test_capabilities.py`, `tests/authz_matrix/test_matrix.py` |
+| Integration: authentication | `tests/auth/test_login.py`, `test_mfa.py`, `test_sessions_and_passwords.py` |
+| Integration: registration | `tests/academics/test_registration.py`, `tests/ui/test_flows.py` |
+| Integration: hostel booking | `tests/hostels/test_hostels.py`, `tests/ui/test_flows.py` |
+| Integration: requests and transfers | `tests/requests/test_requests.py`, `tests/ui/test_flows.py` |
+| Authorization: cross-student | IDOR tests in profile, academics, hostels, clubs, requests, notifications, API suites |
+| Authorization: student → admin, staff → admin-only, admin → superadmin-only | `tests/authz_matrix/test_matrix.py`, `tests/security/test_hardening.py` (URL sweep), `tests/auth/test_authz.py` |
+| Security: SQL injection | `tests/security/test_injection_xss_csrf.py`, `tests/api/test_api.py` |
+| Security: XSS (stored, reflected) | `tests/security/test_injection_xss_csrf.py`; template hygiene in `tests/test_repo_hygiene.py` |
+| Security: CSRF | `tests/security/test_injection_xss_csrf.py`, `tests/security/test_headers_and_errors.py`, `tests/api/test_api.py` |
+| Security: IDOR | feature suites (404 for out-of-scope ids) |
+| Security: privilege escalation | `tests/auth/test_authz.py`, `tests/administration/test_admin_panel.py`, mass-assignment tests in profile/requests |
+| Security: path traversal | `tests/profile/test_uploads.py` (filename sanitising, random storage names) |
+| Security: malicious upload | `tests/profile/test_uploads.py`, `tests/requests/test_requests.py` |
+| Security: brute force | `tests/auth/test_throttle.py`, `tests/auth/test_mfa.py` |
+| Security: session invalidation | `tests/auth/test_sessions_and_passwords.py`, `tests/auth/test_authz.py` (deactivation) |
+| Race conditions | `tests/academics/test_registration_races.py`, `tests/hostels/test_hostel_races.py`, `tests/requests/test_request_numbering_race.py` (PostgreSQL, real threads) |
+
+## Coverage
+
+```bash
+pytest --cov                      # terminal report; fails below 88 %
+pytest --cov --cov-report=html    # htmlcov/index.html (git-ignored)
+```
+
+Latest: 89.8 % branch coverage (2026-10-08). Entry points and the dev/production settings modules are exercised in
+subprocesses by `tests/settings/` and are excluded from measurement (documented in `pyproject.toml`).

@@ -182,6 +182,9 @@ def test_every_non_public_url_requires_login(client):
             continue
         response = client.get(_url(name, pattern))
         checked += 1
+        if name.startswith("api:"):  # JSON API: 403 instead of a login redirect
+            assert response.status_code in (403, 405), f"{name} answered {response.status_code} to an anonymous user"
+            continue
         assert response.status_code in (302, 405), f"{name} answered {response.status_code} to an anonymous user"
         if response.status_code == 302:
             assert response.url.startswith("/accounts/login/"), name

@@ -1,26 +1,29 @@
 # API
 
-Status: **not implemented yet** (planned with the feature phases; design in ARCHITECTURE.md D2).
+Status: **implemented (Phase 13)** — a small, read-mostly JSON API (ARCHITECTURE.md D2) used for integrations and
+future front-ends. The HTML portal does not depend on it.
 
-The inherited code configured Django REST Framework but exposed no endpoints; no API is reachable today.
+## Rules
 
-## Design (binding for implementation)
+* Base path `/api/v1/`. JSON only. **Session authentication + CSRF** (`X-CSRFToken` header) for unsafe methods;
+  no API tokens (nothing to leak into URLs, logs or browser storage). The session policy (timeouts, MFA gate)
+  applies exactly as for HTML pages.
+* Every endpoint returns only the caller's own data; identity comes from the session, never from a parameter.
+* Endpoints use the same selectors/services as the HTML views; serializers declare explicit read-only fields.
+* Lists are paginated (`?page=`; 25 per page). Search input is truncated to 100 characters.
+* Throttles: anonymous 60/hour, authenticated 2000/day.
+* Errors: `{"detail": "..."}`; no stack traces, SQL or internal names. Unauthenticated: 403.
 
-* Base path `/api/v1/`. JSON only. Session authentication + CSRF header for unsafe methods; **no tokens**
-  (nothing to leak into URLs, logs or browser storage).
-* Every endpoint calls the same selectors/services as the HTML views, so authorization, validation and audit are identical.
-* Serializers declare explicit `fields` allowlists; unknown fields are rejected (400), never silently assigned.
-* Object lookups go through actor-scoped querysets: out-of-scope objects return **404**, in-scope but forbidden actions **403**.
-* Pagination on every list (`page_size` ≤ 100); query parameters validated (length, enum, UUID).
-* Throttles: anonymous 60/h, authenticated 2000/day, plus per-endpoint scopes for search and writes.
-* Errors: `{"detail": "..."}` with no stack traces, SQL or internal class names.
+## Endpoints
 
-## Planned endpoints
-
-| Method | Path | Who | Phase |
+| Method | Path | Who | Returns |
 |---|---|---|---|
-| GET | `/api/v1/me/` | any authenticated user (own data only) | 4 |
-| GET | `/api/v1/me/registrations/` | student | 5 |
-| GET | `/api/v1/me/timetable/` | student, lecturer | 6 |
-| GET | `/api/v1/me/notifications/` · POST `.../{id}/read/` | any (own) | 11 |
-| GET | `/api/v1/offerings/?q=&department=` | any authenticated | 5 |
+| GET | `/api/v1/me/` | any signed-in user | own account; students also get their (non-sensitive) record |
+| GET | `/api/v1/me/registrations/` | students | current-semester registrations with offering details |
+| GET | `/api/v1/me/timetable/` | students (registered classes), staff (teaching) | weekly entries for the current semester |
+| GET | `/api/v1/me/notifications/` | any signed-in user | own notifications, newest first |
+| POST | `/api/v1/me/notifications/{id}/read/` | any signed-in user | 204; 404 for someone else's notification |
+| GET | `/api/v1/offerings/?q=` | any signed-in user | browsable offerings of the current semester |
+
+There are deliberately no write endpoints for registrations, bookings or requests: those flows involve
+multi-step validation, locking and audit, and are only available through the HTML views.

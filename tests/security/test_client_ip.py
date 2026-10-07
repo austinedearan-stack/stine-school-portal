@@ -38,10 +38,3 @@ def test_garbage_forwarded_value_falls_back_to_remote_addr():
 
 def test_invalid_remote_addr_returns_none():
     assert get_client_ip(_req(remote="<script>")) is None
-
-
-def test_legacy_utils_wrapper_delegates():
-    from apps.core.utils import get_client_ip as legacy
-
-    with override_settings(TRUSTED_PROXY_COUNT=0):
-        assert legacy(_req(xff="9.9.9.9")) == "203.0.113.10"

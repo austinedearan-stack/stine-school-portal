@@ -16,6 +16,7 @@ urlpatterns = [
     path("requests/", include("apps.student_requests.urls")),
     path("administration/", include("apps.administration.urls")),
     path("notifications/", include("apps.notifications.urls")),
+    path("api/v1/", include("apps.api.urls")),
 ]
 
 # The stock Django admin bypasses MFA, the policy layer and the audit trail (audit finding A-2).

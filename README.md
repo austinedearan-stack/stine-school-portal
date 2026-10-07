@@ -20,13 +20,23 @@ the project brief, with the server — not the browser — enforcing every secur
 | 10 | Admin panel | **Done** — see below |
 | 11 | Notifications & announcements | **Done** — see below |
 | 12 | Security hardening | **Done** — see below |
-| 13 | Automated testing | Not started |
+| 13 | Automated testing | **Done** — see below |
 | 14 | Adversarial testing | Not started |
 | 15 | Deployment preparation | Not started |
 
 **All specified modules are implemented and tested (Phases 1–11).** Security hardening, the full test and
 adversarial campaigns and deployment preparation (Phases 12–15) are still to come; do not deploy to
 production before they are complete.
+
+Phase 13 delivered:
+
+* 640 automated tests (plus 9 PostgreSQL-only concurrency/trigger tests that run in CI), 89.8 % branch coverage with a
+  CI floor of 88 %. Every spec §35 category is mapped to its suites in `TESTING.md`.
+* New suites: authorization matrix (232 role × page cases), SQL injection / stored and reflected XSS / CSRF, end-to-end
+  UI flows through the real forms and templates for every module, JSON API, operator commands and approver scopes.
+* The read-only JSON API of ARCHITECTURE.md D2 (`/api/v1/me/…`, `/api/v1/offerings/`), session-authenticated with
+  CSRF, own data only (`API.md`).
+* Removed the last inherited helper module (`apps/core/utils.py`).
 
 Phase 12 delivered:
 

@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     "apps.student_requests.apps.StudentRequestsConfig",
     "apps.notifications.apps.NotificationsConfig",
     "apps.administration.apps.AdministrationConfig",
+    "apps.api.apps.ApiConfig",
 ]
 
 MIDDLEWARE = [
@@ -231,6 +232,7 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.UserRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {"anon": "60/hour", "user": "2000/day"},
+    "MAX_PAGINATE_BY": 100,
     "EXCEPTION_HANDLER": "rest_framework.views.exception_handler",
 }
 
