@@ -1,42 +1,69 @@
-version: '3.8'
+# Local development stack (PostgreSQL + Redis + Django dev server).
+# Secrets come from .env (git-ignored). Nothing is published on public interfaces:
+# only the web port is bound, and only to 127.0.0.1. Production deployment: see DEPLOYMENT.md.
+name: school-portal
 
 services:
   db:
     image: postgres:16-alpine
-    container_name: school_portal_db
-    restart: always
+    restart: unless-stopped
     environment:
-      POSTGRES_DB: ${DB_NAME:-school_portal_db}
-      POSTGRES_USER: ${DB_USER:-portal_app_user}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-secure_postgres_pass}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?set POSTGRES_SUPERUSER_PASSWORD in .env}
+      DB_NAME: ${DB_NAME:?set DB_NAME in .env}
+      DB_OWNER_USER: ${DB_OWNER_USER:?set DB_OWNER_USER in .env}
+      DB_OWNER_PASSWORD: ${DB_OWNER_PASSWORD:?set DB_OWNER_PASSWORD in .env}
+      DB_USER: ${DB_USER:?set DB_USER in .env}
+      DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+      - ./deploy/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ${DB_NAME}"]
+      interval: 5s
+      retries: 10
+    networks: [backend]
 
   redis:
     image: redis:7-alpine
-    container_name: school_portal_redis
-    restart: always
-    ports:
-      - "6379:6379"
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}", "--appendonly", "no"]
+    networks: [backend]
+
+  migrate:
+    build: .
+    command: ["python", "manage.py", "migrate", "--noinput"]
+    env_file: .env
+    environment:
+      DB_HOST: db
+      # Migrations run as the schema owner, never as the runtime role or the superuser.
+      DB_USER: ${DB_OWNER_USER}
+      DB_PASSWORD: ${DB_OWNER_PASSWORD}
+    depends_on:
+      db: {condition: service_healthy}
+    networks: [backend]
 
   web:
     build: .
-    container_name: school_portal_web
-    restart: always
-    command: python manage.py runserver 0.0.0.0:8000
+    command: ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+    env_file: .env
+    environment:
+      DB_HOST: db
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
     volumes:
       - .:/app
-      - media_data:/app/media
+      - private_media:/app/var/private-media
     ports:
-      - "8000:8000"
-    env_file:
-      - .env
+      - "127.0.0.1:8000:8000"
     depends_on:
-      - db
-      - redis
+      db: {condition: service_healthy}
+      redis: {condition: service_started}
+      migrate: {condition: service_completed_successfully}
+    networks: [backend]
+
+networks:
+  backend: {}
 
 volumes:
   postgres_data:
-  media_data:
+  private_media:
