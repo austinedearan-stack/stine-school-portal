@@ -14,7 +14,7 @@ the project brief, with the server — not the browser — enforcing every secur
 | 4 | Student dashboard & profile | **Done** — see below |
 | 5 | Units & registration | **Done** — see below |
 | 6 | Timetable | **Done** — see below |
-| 7 | Hostels | Not started |
+| 7 | Hostels | **Done** — see below |
 | 8 | Clubs & societies | Not started |
 | 9 | Requests & transfers | Not started |
 | 10 | Admin panel | Not started |
@@ -23,6 +23,17 @@ the project brief, with the server — not the browser — enforcing every secur
 
 **This is not yet a usable portal.** The inherited code was audited and several critical issues
 were found; until each feature phase is complete and tested, treat every feature as unfinished.
+
+Phase 7 delivered:
+
+* Hostel catalogue with derived availability (free beds per hostel), house rules and free-bed lists.
+* Students: direct booking during a DIRECT_BOOKING window; applications with up to three ranked preferences during an
+  APPLICATION window; accept/decline offers before their deadline; cancel. Gender policy and one-bed-per-semester enforced.
+* Accommodation office (`manage_hostels`): review applications (special needs visible only to the applicant and the
+  office), offer beds with an acceptance deadline, direct offers, transfers (both beds locked in id order),
+  check-out, room/bed maintenance status, booking windows, and adding hostels and floors of rooms in bulk.
+* Expired offers lapse lazily inside every booking/offer transaction and through `manage.py expire_hostel_offers`.
+* Locks in the documented order (student, bed(s), allocation/application) with the partial unique indexes as backstop.
 
 Phase 6 delivered:
 

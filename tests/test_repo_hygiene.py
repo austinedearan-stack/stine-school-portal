@@ -91,5 +91,5 @@ def test_row_locks_with_joins_lock_only_the_intended_row():
     assert offenders == []
 
 
-# Inherited modules that are not mounted and are replaced in their feature phase (hostels: Phase 7).
-UNMOUNTED_LEGACY = {"apps/hostels/services.py", "apps/hostels/views.py"}
+# Inherited modules that are not mounted yet and are replaced in their feature phase (empty since Phase 7).
+UNMOUNTED_LEGACY: set[str] = set()

@@ -118,3 +118,31 @@ def at(hour: int, minute: int = 0) -> time:
 
 def aware(dt: datetime) -> datetime:
     return timezone.make_aware(dt) if timezone.is_naive(dt) else dt
+
+
+# --- Hostels ---------------------------------------------------------------------------------------
+
+
+def hostel(**kw):
+    from apps.hostels.models import Hostel
+
+    i = n()
+    return Hostel.objects.create(**{"code": f"H{i}", "name": f"Hostel {i}", **kw})
+
+
+def bed(hostel_obj=None, **room_kw):
+    from apps.hostels.models import Bed, HostelBuilding, HostelFloor, Room
+
+    hostel_obj = hostel_obj or hostel()
+    building, _ = HostelBuilding.objects.get_or_create(hostel=hostel_obj, name="Block A")
+    floor, _ = HostelFloor.objects.get_or_create(building=building, level=1)
+    room = Room.objects.create(floor=floor, number=str(100 + n()), **{"capacity": 2, **room_kw})
+    return Bed.objects.create(room=room, label="A")
+
+
+def booking_window(semester, mode="DIRECT_BOOKING", **kw):
+    from apps.hostels.models import HostelBookingWindow
+
+    now = timezone.now()
+    return HostelBookingWindow.objects.create(
+        semester=semester, mode=mode, **{"opens_at": now - timedelta(days=1), "closes_at": now + timedelta(days=7), **kw})

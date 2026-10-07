@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Hostel application{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div><h1>Application · {{ application.student.user.full_name }}</h1><p>{{ application.student.student_number }} · {{ application.student.program.name }} · {{ application.semester }}</p></div>
+  <a class="btn btn-secondary" href="{% url 'hostels:manage' %}">Back</a>
+</div>
+<div class="grid grid-2">
+  <section class="card">
+    <h2>Details</h2>
+    <dl class="details">
+      <dt>Status</dt><dd><span class="badge">{{ application.get_status_display }}</span></dd>
+      <dt>Preferences</dt><dd>{% for h in preferred %}{{ forloop.counter }}. {{ h.name }}<br>{% endfor %}</dd>
+      <dt>Room type</dt><dd>{{ application.get_preferred_room_type_display|default:"No preference" }}</dd>
+      <dt>Gender on record</dt><dd>{{ application.student.get_gender_display|default:"Not recorded" }}</dd>
+      <dt>Special needs</dt><dd class="prewrap">{{ application.special_needs|default:"–" }}</dd>
+    </dl>
+  </section>
+  <section class="card">
+    <h2>Decision</h2>
+    <form method="post" class="form">{% csrf_token %}<input type="hidden" name="form" value="decision">
+      {% with form=decision_form %}{% include "partials/form.html" %}{% endwith %}
+      <button class="btn btn-secondary" type="submit">Save decision</button>
+    </form>
+  </section>
+  <section class="card">
+    <h2>Offer a bed ({{ free_count }} free in preferred hostels)</h2>
+    <form method="post" class="form">{% csrf_token %}<input type="hidden" name="form" value="offer">
+      {{ offer_form.non_field_errors }}
+      <div class="field"><label for="{{ offer_form.bed.id_for_label }}">Bed</label>{{ offer_form.bed }}{{ offer_form.bed.errors }}</div>
+      <button class="btn" type="submit">Send offer</button>
+    </form>
+  </section>
+</div>
+{% endblock %}

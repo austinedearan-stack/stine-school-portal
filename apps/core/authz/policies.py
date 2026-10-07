@@ -155,3 +155,18 @@ def can_record_grade(actor, registration) -> bool:
     if has_capability(actor, "manage_grades"):
         return True
     return has_capability(actor, "record_grades") and _teaches(actor, registration.offering)
+
+
+# --- Hostels ---------------------------------------------------------------------------------------
+
+
+@policy("can_book_bed")
+def can_book_bed(actor, student) -> bool:
+    """Students apply, book, accept and cancel only for themselves (admins allocate via can_manage_hostels)."""
+    return actor.role == Role.STUDENT and student is not None and student.user_id == actor.pk
+
+
+@policy("can_view_hostel_application")
+def can_view_hostel_application(actor, application) -> bool:
+    """Includes special needs: the applicant and manage_hostels holders only."""
+    return application.student.user_id == actor.pk or has_capability(actor, "manage_hostels")

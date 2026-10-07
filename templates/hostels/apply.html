@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Apply for a hostel{% endblock %}
+{% block content %}
+<div class="page-header"><div><h1>Apply for a hostel</h1><p>Rank up to three hostels. You will be notified when a bed is offered.</p></div></div>
+<div class="card"><form method="post" class="form" novalidate>
+  {% csrf_token %}
+  {% include "partials/form.html" %}
+  <button class="btn" type="submit">Submit application</button>
+  <a class="btn btn-secondary" href="{% url 'hostels:my_hostel' %}">Cancel</a>
+</form></div>
+{% endblock %}

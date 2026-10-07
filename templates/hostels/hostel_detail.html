@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}{{ hostel.name }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div><h1>{{ hostel.name }}</h1><p>{{ hostel.get_gender_policy_display }} · {{ hostel.campus }}</p></div>
+  <a class="btn btn-secondary" href="{% url 'hostels:catalog' %}">All hostels</a>
+</div>
+<div class="grid grid-2">
+  <section class="card">
+    <h2>House rules</h2>
+    <p class="prewrap">{{ hostel.rules|default:"No rules published." }}</p>
+  </section>
+  <section class="card">
+    <h2>Free beds{% if semester %} · {{ semester }}{% endif %}</h2>
+    {% if user.role == "STUDENT" and not gender_ok %}<p class="alert alert-warning">This hostel's gender policy does not match your record.</p>{% endif %}
+    {% if beds %}
+    <div class="table-wrap"><table class="table">
+      <thead><tr><th>Bed</th><th>Room type</th><th>Fee / semester</th><th></th></tr></thead>
+      <tbody>{% for bed in beds %}<tr>
+        <td>{{ bed.room.floor.building.name }} · floor {{ bed.room.floor.level }} · room {{ bed.room.number }} · bed {{ bed.label }}</td>
+        <td>{{ bed.room.get_room_type_display }}</td>
+        <td>{{ bed.room.fee_per_semester }}</td>
+        <td>{% if can_book %}<form method="post" action="{% url 'hostels:book' bed.pk %}">{% csrf_token %}<button class="btn btn-small" type="submit">Book</button></form>{% endif %}</td>
+      </tr>{% endfor %}</tbody>
+    </table></div>
+    {% else %}<p class="empty">No free beds.</p>{% endif %}
+  </section>
+</div>
+{% endblock %}

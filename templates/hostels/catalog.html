@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Hostels{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div><h1>Hostels</h1><p>{{ semester|default:"No current semester" }}</p></div>
+  {% if user.role == "STUDENT" %}<a class="btn btn-secondary" href="{% url 'hostels:my_hostel' %}">My accommodation</a>{% endif %}
+</div>
+{% if direct_window %}<div class="alert alert-success">Direct booking is open until {{ direct_window.closes_at|date:"j M Y H:i" }}. Choose a hostel to see free beds.</div>{% endif %}
+{% if application_window %}<div class="alert">Applications are open until {{ application_window.closes_at|date:"j M Y H:i" }}.{% if user.role == "STUDENT" %} <a href="{% url 'hostels:apply' %}">Apply now</a>.{% endif %}</div>{% endif %}
+{% if not direct_window and not application_window %}<div class="alert alert-warning">Hostel booking is currently closed.</div>{% endif %}
+<div class="grid grid-3">
+{% for hostel, free, total in hostels %}
+  <section class="card">
+    <h2><a href="{% url 'hostels:detail' hostel.pk %}">{{ hostel.name }}</a></h2>
+    <p><span class="badge">{{ hostel.get_gender_policy_display }}</span> <span class="badge">{{ hostel.campus }}</span></p>
+    <p>{{ free }} of {{ total }} beds free</p>
+  </section>
+{% empty %}
+  <div class="card"><p class="empty">No hostels are listed.</p></div>
+{% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}My accommodation{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div><h1>My accommodation</h1><p>{{ semester|default:"No current semester" }}</p></div>
+  <a class="btn btn-secondary" href="{% url 'hostels:catalog' %}">Browse hostels</a>
+</div>
+<div class="grid grid-2">
+  <section class="card">
+    <h2>This semester</h2>
+    {% if allocation %}
+      <p><strong>{{ allocation.bed }}</strong></p>
+      <p><span class="badge {% if allocation.status == 'ACTIVE' %}badge-ok{% else %}badge-warn{% endif %}">{{ allocation.get_status_display }}</span></p>
+      {% if allocation.status == "PENDING_ACCEPTANCE" %}
+        <p>Accept by <strong>{{ allocation.offer_expires_at|date:"j M Y H:i" }}</strong> or the offer will lapse.</p>
+        <form method="post" action="{% url 'hostels:respond' allocation.pk %}" class="row">{% csrf_token %}
+          <button class="btn btn-success" type="submit" name="decision" value="accept">Accept offer</button>
+          <button class="btn btn-secondary" type="submit" name="decision" value="decline">Decline</button>
+        </form>
+      {% endif %}
+    {% elif application %}
+      <p>Application submitted {{ application.created_at|date:"j M Y" }} · <span class="badge badge-info">{{ application.get_status_display }}</span></p>
+      <p>Preferences: {% for p in application.preferences.all %}{{ p.rank }}. {{ p.hostel.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
+      {% if application.decision_note %}<p class="small">Note from the office: {{ application.decision_note }}</p>{% endif %}
+    {% else %}
+      <p class="empty">You have no bed or application this semester.</p>
+      {% if application_window %}<a class="btn" href="{% url 'hostels:apply' %}">Apply for a hostel</a>{% endif %}
+    {% endif %}
+    {% if allocation or application %}
+      <form method="post" action="{% url 'hostels:cancel' %}" class="mt">{% csrf_token %}<button class="btn btn-danger btn-small" type="submit">Cancel my booking / application</button></form>
+    {% endif %}
+  </section>
+  <section class="card">
+    <h2>History</h2>
+    {% for a in history %}<p>{{ a.semester }} · {{ a.bed }} · <span class="badge">{{ a.get_status_display }}</span></p>
+    {% empty %}<p class="empty">No earlier allocations.</p>{% endfor %}
+  </section>
+</div>
+{% endblock %}

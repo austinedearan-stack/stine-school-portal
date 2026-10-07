@@ -81,6 +81,14 @@ Markers: `postgres` (requires PostgreSQL — skipped on SQLite), `slow`.
 * 258 passed, 5 skipped. `tests/timetable/test_timetable.py` (15): venue / lecturer / group clashes, back-to-back and cross-semester slots,
   capacity, self-overlap on edit, lecturer change, capability checks, personal vs master visibility, POST-only delete.
 
+## Phase 7 results (2026-10-08)
+
+* 279 passed, 7 skipped. `tests/hostels/test_hostels.py` (21): booking, gender policy, maintenance, windows, cancel, application/offer/accept/
+  decline/expiry (lazy and command), transfer/vacate, capability checks, UI booking, offer IDOR, special-needs privacy.
+* `tests/hostels/test_hostel_races.py` (2, PostgreSQL only): last bed and one-bed-per-student under concurrency.
+* Fix found by the tests: refusing an expired offer used to roll back the expiry itself; the expiry now commits and the
+  refusal is raised afterwards.
+
 ## Required categories (spec §35) — coverage plan
 
 | Category | Phase(s) |

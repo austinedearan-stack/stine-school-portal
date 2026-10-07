@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}{% if hostel %}{{ hostel.name }}{% else %}Add hostel{% endif %}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div><h1>{% if hostel %}{{ hostel.name }}{% else %}Add hostel{% endif %}</h1></div>
+  <a class="btn btn-secondary" href="{% url 'hostels:manage' %}">Back</a>
+</div>
+<div class="grid grid-2">
+  <section class="card">
+    <h2>Hostel</h2>
+    <form method="post" class="form" novalidate>{% csrf_token %}<input type="hidden" name="form" value="hostel">
+      {% include "partials/form.html" %}
+      <button class="btn" type="submit">Save</button>
+    </form>
+  </section>
+  {% if hostel %}
+  <section class="card">
+    <h2>Add a floor of rooms</h2>
+    <form method="post" class="form" novalidate>{% csrf_token %}<input type="hidden" name="form" value="rooms">
+      {% with form=rooms_form %}{% include "partials/form.html" %}{% endwith %}
+      <button class="btn" type="submit">Add rooms</button>
+    </form>
+  </section>
+  {% endif %}
+</div>
+{% if rooms %}
+<section class="card">
+  <h2>Rooms and beds</h2>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Room</th><th>Type</th><th>Status</th><th>Beds</th></tr></thead>
+    <tbody>{% for room in rooms %}<tr>
+      <td>{{ room.floor.building.name }} · floor {{ room.floor.level }} · {{ room.number }}</td>
+      <td>{{ room.get_room_type_display }}</td>
+      <td><form method="post" action="{% url 'hostels:space_status' 'room' room.pk %}" class="row">{% csrf_token %}
+        <select name="status">{% for value, label in status_form.fields.status.choices %}<option value="{{ value }}"{% if value == room.status %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+        <button class="btn btn-secondary btn-small" type="submit">Set</button></form></td>
+      <td>{% for bed in room.beds.all %}
+        <form method="post" action="{% url 'hostels:space_status' 'bed' bed.pk %}" class="row">{% csrf_token %}{{ bed.label }}
+          <select name="status">{% for value, label in status_form.fields.status.choices %}<option value="{{ value }}"{% if value == bed.status %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+          <button class="btn btn-secondary btn-small" type="submit">Set</button></form>
+      {% endfor %}</td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+{% endif %}
+{% endblock %}

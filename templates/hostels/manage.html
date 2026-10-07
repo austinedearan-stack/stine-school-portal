@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Hostel management{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div><h1>Hostel management</h1><p>{{ semester|default:"No current semester" }}</p></div>
+  <div class="row">
+    <a class="btn" href="{% url 'hostels:direct_offer' %}">Offer a bed</a>
+    <a class="btn btn-secondary" href="{% url 'hostels:window_create' %}">New booking window</a>
+    <a class="btn btn-secondary" href="{% url 'hostels:hostel_create' %}">Add hostel</a>
+  </div>
+</div>
+<section class="card">
+  <h2>Applications</h2>
+  <form method="get" class="filters">
+    <div class="field"><label for="status">Status</label>
+      <select id="status" name="status"><option value="">All</option>{% for value, label in statuses %}<option value="{{ value }}"{% if value == status %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+    <button class="btn btn-secondary" type="submit">Filter</button>
+  </form>
+  {% if applications %}
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Submitted</th><th>Student</th><th>Program</th><th>Preferences</th><th>Status</th><th></th></tr></thead>
+    <tbody>{% for a in applications %}<tr>
+      <td>{{ a.created_at|date:"j M H:i" }}</td>
+      <td>{{ a.student.student_number }} {{ a.student.user.full_name }}</td>
+      <td>{{ a.student.program.code }}</td>
+      <td>{% for p in a.preferences.all %}{{ p.hostel.code }}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
+      <td><span class="badge">{{ a.get_status_display }}</span></td>
+      <td><a class="btn btn-secondary btn-small" href="{% url 'hostels:application' a.pk %}">Review</a></td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  {% else %}<p class="empty">No applications.</p>{% endif %}
+</section>
+<section class="card">
+  <h2>Current allocations and offers</h2>
+  {% if allocations %}
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Student</th><th>Bed</th><th>Status</th><th></th></tr></thead>
+    <tbody>{% for a in allocations %}<tr>
+      <td>{{ a.student.student_number }} {{ a.student.user.full_name }}</td>
+      <td>{{ a.bed }}</td>
+      <td><span class="badge">{{ a.get_status_display }}</span>{% if a.offer_expires_at and a.status == "PENDING_ACCEPTANCE" %} <span class="small muted">until {{ a.offer_expires_at|date:"j M H:i" }}</span>{% endif %}</td>
+      <td class="row">
+        {% if a.status == "ACTIVE" %}<a class="btn btn-secondary btn-small" href="{% url 'hostels:transfer' a.pk %}">Transfer</a>{% endif %}
+        <form method="post" action="{% url 'hostels:vacate' a.pk %}" class="inline">{% csrf_token %}<button class="btn btn-danger btn-small" type="submit">{% if a.status == "ACTIVE" %}Check out{% else %}Withdraw{% endif %}</button></form>
+      </td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  {% else %}<p class="empty">No allocations this semester.</p>{% endif %}
+</section>
+<div class="grid grid-2">
+  <section class="card">
+    <h2>Booking windows</h2>
+    {% for w in windows %}<p>{{ w.get_mode_display }}: {{ w.opens_at|date:"j M Y H:i" }} – {{ w.closes_at|date:"j M Y H:i" }} (accept within {{ w.acceptance_hours }} h)</p>
+    {% empty %}<p class="empty">No windows for this semester.</p>{% endfor %}
+  </section>
+  <section class="card">
+    <h2>Hostels</h2>
+    {% for h in hostels %}<p><a href="{% url 'hostels:hostel_edit' h.pk %}">{{ h.name }}</a> <span class="badge">{{ h.get_gender_policy_display }}</span>{% if not h.is_active %} <span class="badge">Closed</span>{% endif %}</p>
+    {% empty %}<p class="empty">No hostels.</p>{% endfor %}
+  </section>
+</div>
+{% endblock %}

@@ -9,6 +9,7 @@ urlpatterns = [
     path("accounts/", include("apps.accounts.urls")),
     path("academics/", include("apps.academics.urls")),
     path("timetable/", include("apps.timetable.urls")),
+    path("hostels/", include("apps.hostels.urls")),
     # Feature modules are mounted as each is rebuilt on the Phase 2 schema (phases 4-11).
 ]
 
