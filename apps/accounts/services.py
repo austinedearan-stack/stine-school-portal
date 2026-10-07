@@ -14,7 +14,7 @@ from django.contrib.auth.hashers import make_password
 from django.utils.http import url_has_allowed_host_and_scheme
 
 from apps.accounts import devices, mfa, sessions
-from apps.accounts.models import User
+from apps.accounts.models import User, normalise_identifier
 from apps.accounts.throttle import LoginThrottle
 from apps.core.audit import record_audit_event, record_security_event
 from apps.core.context import RequestContext
@@ -40,7 +40,7 @@ class LoginResult:
 
 
 def resolve_identifier(identifier: str) -> User | None:
-    identifier = (identifier or "").strip()
+    identifier = normalise_identifier(identifier)
     if not identifier or len(identifier) > 254:
         return None
     if "@" in identifier:

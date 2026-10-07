@@ -1,7 +1,7 @@
 # Security Test Report
 
 Security controls implemented and tested against the defined test cases. This does **not** mean the
-system is secure: most features are not yet built (see README status). The report grows each phase;
+system is secure. All modules are implemented (see README status). The report grows each phase;
 Phase 14 (adversarial testing) executes the full spec §36 attack list.
 
 Environment for Phase 1 results: Python 3.13.16, Django 5.2.18, PostgreSQL 16.15 and SQLite, 2026-10-07.
@@ -41,6 +41,40 @@ Environment: Python 3.14.5, Django 5.2.18, SQLite (PostgreSQL-only tests run in 
 | P3-08 | Password reset abuse (A-4) | Reuse code; 5 wrong attempts; code after password change; reset to bypass MFA | All refused; MFA still required | Reset not implemented | Emailed HMAC code, 20 min, 5 attempts, single use | `tests/auth/test_sessions_and_passwords.py` |
 | P3-09 | Privilege escalation via role management (T6, Z-6) | Admin in Superadmin group changes roles; self role change; out-of-ceiling group; removing last superadmin; IT support resetting an admin's MFA | All refused | All admins had all powers | Ceilings + `authorize` + invariants under row locks | `tests/auth/test_authz.py` |
 | P3-10 | Cross-site logout (A-10) | `GET /accounts/logout/` | 405 | Logged out | POST-only logout | `test_logout_requires_post_and_flushes_session` |
+
+## Phase 14 — adversarial testing (2026-10-08)
+
+Method: (1) an attacker-mindset review of every module's code against the threat model (ARCHITECTURE.md §6);
+(2) `tests/adversarial/test_campaign.py` — each attack scripted from the attacker's side (28 tests); (3) a black-box
+probe over real HTTP (`scripts/security_probe.py`, 26 checks) against a local development server with seeded fake data,
+DEBUG off. Earlier phases' attack tests (P1–P3 above, feature suites, Phase 13 security suites) were re-run unchanged.
+
+| # | Vulnerability tested | Attack method | Expected | Actual (before fix) | Fix | Regression test |
+|---|---|---|---|---|---|---|
+| P14-01 | **Homoglyph twin accounts / throttle evasion** | Create `Ｓ123` (fullwidth) or `S123е` (Cyrillic) next to `S123`; sign in or guess passwords with look-alike identifiers | Refused; look-alikes resolve to (and are throttled with) the canonical account | **Twin accounts could be created; look-alike identifiers had separate throttle budgets** | NFKC normalisation of identifiers at creation, lookup, throttle subject and identifier hashing; usernames restricted to ASCII (migration `accounts.0004`) | `test_fullwidth_lookalike_username_cannot_create_a_twin_account`, `test_lookalike_identifier_signs_in_to_the_canonical_account_and_shares_its_throttle` |
+| P14-02 | Session replay | Reuse a session cookie after the victim logs out | Anonymous | Refused | — | `test_stolen_session_cookie_is_useless_after_logout` |
+| P14-03 | Device-cookie forgery | Present a forged trusted-device cookie to escape the lockout | Still throttled | Refused | — | `test_forged_device_cookie_does_not_bypass_the_lockout` |
+| P14-04 | Host header injection | `Host: evil.example.com` | 400 | 400 (and reset mails contain no links) | — | `test_unknown_host_header_is_refused` |
+| P14-05 | Input abuse | Null bytes, 500-char subjects, 10 000-char searches, 1 MB passwords, negative/huge numbers, page=-1/abc/1e9 | Clean form errors, no 500, no hashing of giant passwords | As expected | — | `test_null_bytes_…`, `test_megabyte_password_…`, `test_negative_and_out_of_range_numbers_…`, `test_pagination_abuse_is_harmless` (5) |
+| P14-06 | HTTP verb tampering | GET/PUT/PATCH/DELETE on state-changing endpoints; TRACE | 405 | 405 | — | `test_state_changing_endpoints_refuse_get_and_other_verbs`; probe |
+| P14-07 | Hidden-field tampering | Student posts `form=offer` to the accommodation office page | 403 | 403 | — | `test_student_cannot_reach_office_branches_by_tampering_hidden_fields` |
+| P14-08 | Sensitive paths / traversal | `/.env`, `/.git/config`, `/admin/`, `/static/../manage.py`, encoded traversal | 404/redirect, nothing disclosed | 404 through WhiteNoise. Only Django's **development** static handler (`runserver --insecure`) answered 500 to `/static/../manage.py` (SuspiciousFileOperation, nothing disclosed) | Not applicable to production (WhiteNoise serves static; Nginx in front); documented | `test_sensitive_paths_are_not_served` (9); probe |
+| P14-09 | Self-escalation | Superadmin/admin changes own groups; open redirect via re-authentication `next` | Refused | Refused | — | `test_superadmin_cannot_change_own_groups_…`, `test_open_redirect_through_reauthentication_next_is_refused` |
+| P14-10 | Enrollment-code brute force | Guess codes after a stolen password | Pre-auth discarded after 5 tries | As expected | — | `test_enrollment_code_guessing_is_cut_off` |
+| P14-11 | Script in upload filename | `"><script>….png` | Sanitised name, escaped output | As expected | — | `test_script_in_attachment_filename_is_neutralised` |
+| P14-12 | Version disclosure | Inspect `Server` header | No version | Development server reports `WSGIServer/0.2 CPython/…` | Production: Nginx `server_tokens off` and hides the upstream header (Phase 15) | probe check "no Server version leak" |
+
+Black-box probe result (DEBUG off, static via WhiteNoise): 25/26 checks pass; the remaining one is P14-12 (development
+server only). Headers, CSRF on the login form, generic failures, throttling (429 after 5 failures), API refusal,
+request-id sanitising, 404 page without debug detail, and refusal of sensitive paths were all confirmed over HTTP.
+
+Accepted residual risks (documented, not fixed):
+* An attacker who already knows a user's password can exhaust that user's MFA attempt budget (10 per 15 minutes),
+  delaying the real user's sign-in by up to 15 minutes; the password should be changed in that case.
+* Student and staff IDs and email addresses have separate throttle budgets (by design, so throttling is not a
+  linking oracle; ARCHITECTURE.md §4.1).
+* Audit records keep the before/after values of contact fields; readable only with `view_audit_logs`.
+* Race and trigger tests run on PostgreSQL in CI only; they were not executed in this environment.
 
 ## Known open issues (not yet fixed)
 

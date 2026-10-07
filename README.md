@@ -21,12 +21,21 @@ the project brief, with the server — not the browser — enforcing every secur
 | 11 | Notifications & announcements | **Done** — see below |
 | 12 | Security hardening | **Done** — see below |
 | 13 | Automated testing | **Done** — see below |
-| 14 | Adversarial testing | Not started |
+| 14 | Adversarial testing | **Done** — see below |
 | 15 | Deployment preparation | Not started |
 
 **All specified modules are implemented and tested (Phases 1–11).** Security hardening, the full test and
 adversarial campaigns and deployment preparation (Phases 12–15) are still to come; do not deploy to
 production before they are complete.
+
+Phase 14 delivered:
+
+* Attacker-mindset review of every module plus a scripted adversarial campaign (`tests/adversarial/`, 28 tests) and a
+  black-box HTTP probe (`scripts/security_probe.py`, 26 checks) against a running server.
+* Found and fixed: Unicode look-alike usernames (fullwidth / Cyrillic) could create twin accounts and dodge
+  per-identifier throttling — identifiers are now NFKC-normalised everywhere and usernames are ASCII-only.
+* Confirmed over HTTP: headers, CSRF, generic failures, throttling, API refusal, no debug detail, sensitive paths.
+  Full results and accepted residual risks in `SECURITY_TEST_REPORT.md` (P14-01 … P14-12).
 
 Phase 13 delivered:
 

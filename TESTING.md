@@ -138,6 +138,12 @@ Markers: `postgres` (requires PostgreSQL — skipped on SQLite), `slow`.
   flows), `tests/api/` (9), `tests/test_commands_and_scopes.py` (9).
 * Fixed while writing the suite: the URL sweep now distinguishes the JSON API (403) from pages (login redirect).
 
+## Phase 14 results (2026-10-08)
+
+* `tests/adversarial/test_campaign.py` (28) added; full suite 668 passed, 9 skipped (PostgreSQL-only).
+* `python scripts/security_probe.py <base-url>`: black-box checks for a running server (exit 1 on failure). Against the
+  local development server: 25/26 (the development server's `Server` header; production hides it in Nginx).
+
 ## Required categories (spec §35) — where each is tested
 
 | Category | Suites |

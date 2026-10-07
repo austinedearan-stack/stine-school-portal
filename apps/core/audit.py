@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import logging
+import unicodedata
 from typing import Any
 
 from django.conf import settings
@@ -99,7 +100,7 @@ def record_denial(actor, action: str, obj=None, *, ctx: RequestContext = SYSTEM,
 
 
 def hash_identifier(identifier: str) -> str:
-    normalised = (identifier or "").strip().lower()
+    normalised = unicodedata.normalize("NFKC", identifier or "").strip().lower()
     return keyed_digest(normalised, purpose="identifier") if normalised else ""
 
 

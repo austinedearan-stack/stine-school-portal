@@ -13,6 +13,7 @@ Rules for login:
 
 from __future__ import annotations
 
+import unicodedata
 from dataclasses import dataclass
 
 from apps.core import ratelimit
@@ -25,7 +26,7 @@ DEVICE_THRESHOLD = 5
 
 
 def subject_for(identifier: str) -> str:
-    return keyed_digest((identifier or "").strip().lower(), purpose="throttle-subject")[:32]
+    return keyed_digest(unicodedata.normalize("NFKC", identifier or "").strip().lower(), purpose="throttle-subject")[:32]
 
 
 @dataclass

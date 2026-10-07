@@ -4,9 +4,11 @@ Lockout counters are deliberately NOT stored on the user row (they live in the r
 ARCHITECTURE.md §4.1). Codes and nonces are stored only as HMAC digests.
 """
 
+import unicodedata
 import uuid
 
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
+from django.contrib.auth.validators import ASCIIUsernameValidator
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models.functions import Lower
@@ -14,6 +16,12 @@ from django.utils import timezone
 
 from apps.core.capabilities import Role
 from apps.core.models import TimeStampedModel
+
+
+def normalise_identifier(value: str) -> str:
+    """NFKC-normalise and trim an identifier, so look-alike Unicode forms (e.g. fullwidth "Ｓ123") collapse to
+    one canonical value for storage, lookup and throttling (no homoglyph twin accounts)."""
+    return unicodedata.normalize("NFKC", value or "").strip()
 
 
 class UserManager(BaseUserManager):
@@ -29,7 +37,8 @@ class UserManager(BaseUserManager):
             raise ValueError("Users must have an email address.")
         if extra_fields.get("is_superuser"):
             raise ValueError("Portal accounts never use is_superuser (ARCHITECTURE.md D4).")
-        user = self.model(username=username.strip(), email=self.normalize_email(email).strip(), role=role, **extra_fields)
+        user = self.model(username=normalise_identifier(username), email=normalise_identifier(self.normalize_email(email)),
+                          role=role, **extra_fields)
         if password:
             user.set_password(password)
         else:
@@ -46,7 +55,10 @@ class UserManager(BaseUserManager):
 
 class User(AbstractBaseUser, PermissionsMixin):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    username = models.CharField(max_length=50, unique=True, help_text="Student or staff ID; the login identifier.")
+    username = models.CharField(
+        max_length=50, unique=True, validators=[ASCIIUsernameValidator()],
+        help_text="Student or staff ID; the login identifier (ASCII letters, digits and @.+-_ only).",
+    )
     email = models.EmailField(max_length=254, unique=True)
     first_name = models.CharField(max_length=100, blank=True)
     last_name = models.CharField(max_length=100, blank=True)
