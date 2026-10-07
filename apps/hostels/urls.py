@@ -1,4 +1,5 @@
 from django.urls import path
+
 from apps.hostels import views
 
 app_name = 'hostels'

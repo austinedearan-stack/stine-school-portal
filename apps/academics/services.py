@@ -1,7 +1,8 @@
-from django.db import transaction
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.utils import timezone
-from apps.academics.models import Unit, Semester, UnitRegistration, UnitPrerequisite
+
+from apps.academics.models import Semester, Unit, UnitPrerequisite, UnitRegistration
 from apps.core.utils import log_audit_event
 
 MAX_SEMESTER_CREDIT_HOURS = 24
@@ -22,12 +23,12 @@ def register_student_unit(student_profile, unit_id, semester_id, actor=None, ip_
         try:
             unit = Unit.objects.select_for_update().get(id=unit_id)
         except Unit.DoesNotExist:
-            raise ValidationError("Academic unit not found.")
+            raise ValidationError("Academic unit not found.") from None
 
         try:
             semester = Semester.objects.get(id=semester_id)
         except Semester.DoesNotExist:
-            raise ValidationError("Academic semester not found.")
+            raise ValidationError("Academic semester not found.") from None
 
         # 1. Registration window check
         if not semester.registration_open:
@@ -133,7 +134,7 @@ def drop_student_unit(student_profile, registration_id, actor=None, ip_address=N
                 status='REGISTERED'
             )
         except UnitRegistration.DoesNotExist:
-            raise ValidationError("Active registration record not found.")
+            raise ValidationError("Active registration record not found.") from None
 
         if not reg.semester.registration_open:
             raise ValidationError("Cannot drop unit: the registration period for this semester has closed.")

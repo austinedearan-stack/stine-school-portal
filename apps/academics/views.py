@@ -1,12 +1,14 @@
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.core.exceptions import ValidationError, PermissionDenied
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models import Q
-from apps.academics.models import Unit, Semester, UnitRegistration, Department
-from apps.academics.services import register_student_unit, drop_student_unit
+from django.shortcuts import get_object_or_404, redirect, render
+
+from apps.academics.models import Department, Semester, Unit, UnitRegistration
+from apps.academics.services import drop_student_unit, register_student_unit
 from apps.core.permissions import ROLE_STUDENT
 from apps.core.utils import get_client_ip
+
 
 @login_required
 def unit_catalog_view(request):
@@ -101,7 +103,7 @@ def register_unit_view(request):
         messages.success(request, "Successfully registered for unit!")
     except ValidationError as e:
         messages.error(request, e.message)
-    except Exception as e:
+    except Exception:
         messages.error(request, "An unexpected error occurred during registration. Please try again.")
 
     return redirect('academics:my_units')
@@ -139,7 +141,7 @@ def my_units_view(request):
         return redirect('core:dashboard')
 
     current_semester = Semester.objects.filter(is_current=True).first()
-    
+
     current_registrations = UnitRegistration.objects.filter(
         student=request.user.student_profile,
         semester=current_semester,

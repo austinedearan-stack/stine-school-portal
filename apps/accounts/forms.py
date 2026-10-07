@@ -1,13 +1,15 @@
 from django import forms
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
-from apps.accounts.models import StudentProfile, User
+
+from apps.accounts.models import StudentProfile
 from apps.core.utils import (
-    validate_file_security,
     ALLOWED_IMAGE_EXTENSIONS,
     ALLOWED_IMAGE_MIMES,
     MAX_PROFILE_PHOTO_SIZE,
+    validate_file_security,
 )
+
 
 class LoginForm(forms.Form):
     identifier = forms.CharField(

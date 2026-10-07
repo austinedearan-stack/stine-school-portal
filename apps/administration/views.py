@@ -1,26 +1,24 @@
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.core.exceptions import PermissionDenied
+from django.contrib.auth.decorators import login_required
+from django.db.models import Q
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
-from django.db.models import Count, Q
-from apps.accounts.models import User, StudentProfile, StaffProfile
-from apps.academics.models import Unit, Program, Department, Faculty
-from apps.hostels.models import Bed, Room, Hostel
+
+from apps.academics.models import Unit
+from apps.accounts.models import StaffProfile, StudentProfile, User
 from apps.clubs.models import Club, ClubMembership
-from apps.requests.models import StudentRequest, RequestCategory, RequestMessage, TransferRequest
 from apps.core.models import AuditLog, SecurityEventLog
-from apps.notifications.services import send_in_app_notification
 from apps.core.permissions import (
-    role_required,
-    can_view_audit_logs,
-    can_manage_users,
-    can_approve_transfers,
     ROLE_ADMIN,
-    ROLE_SUPERADMIN,
     ROLE_STAFF,
+    ROLE_SUPERADMIN,
+    role_required,
 )
-from apps.core.utils import log_audit_event, get_client_ip
+from apps.core.utils import get_client_ip, log_audit_event
+from apps.hostels.models import Bed
+from apps.notifications.services import send_in_app_notification
+from apps.student_requests.models import RequestCategory, RequestMessage, StudentRequest, TransferRequest
+
 
 @login_required
 @role_required(ROLE_ADMIN, ROLE_SUPERADMIN)

@@ -1,6 +1,8 @@
 from django.core.exceptions import ValidationError
 from django.db.models import Q
+
 from apps.timetable.models import TimetableEntry
+
 
 def validate_timetable_entry(unit, classroom, lecturer, semester, day_of_week, start_time, end_time, exclude_id=None):
     """

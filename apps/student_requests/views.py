@@ -1,20 +1,29 @@
 import os
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
+
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.http import FileResponse, Http404
-from apps.requests.models import StudentRequest, RequestCategory, RequestMessage, RequestAttachment, TransferRequest
+from django.shortcuts import get_object_or_404, redirect, render
+
 from apps.academics.models import Program
-from apps.core.permissions import can_view_request, ROLE_STUDENT, ADMIN_ROLES
+from apps.core.permissions import ROLE_STUDENT, can_view_request
 from apps.core.utils import (
-    log_audit_event,
-    get_client_ip,
-    validate_file_security,
     ALLOWED_DOCUMENT_EXTENSIONS,
     ALLOWED_DOCUMENT_MIMES,
     MAX_ATTACHMENT_SIZE,
+    get_client_ip,
+    log_audit_event,
+    validate_file_security,
 )
+from apps.student_requests.models import (
+    RequestAttachment,
+    RequestCategory,
+    RequestMessage,
+    StudentRequest,
+    TransferRequest,
+)
+
 
 @login_required
 def student_request_list_view(request):
@@ -120,7 +129,7 @@ def request_detail_view(request, ticket_number):
         raise PermissionDenied("You are not authorized to view this ticket.")
 
     is_student_caller = (request.user.role == ROLE_STUDENT)
-    
+
     # Hide internal staff notes from students
     messages_qs = ticket.messages.select_related('sender')
     if is_student_caller:

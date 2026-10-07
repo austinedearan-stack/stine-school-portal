@@ -1,41 +1,82 @@
-from .base import *
+"""Production settings.
+
+Fails fast (ImproperlyConfigured) on any unsafe or missing configuration instead of silently
+falling back to insecure defaults.
+"""
+
+from django.core.exceptions import ImproperlyConfigured
+
+from .base import *  # noqa: F403
+from .base import ALLOWED_HOSTS, DJANGO_ADMIN_ENABLED, SECRET_KEY, TRUSTED_PROXY_COUNT, database_from_env
+from .env import env_bool, env_int, env_list, env_str
 
 DEBUG = False
 
-# Production PostgreSQL Database
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('DB_NAME', 'school_portal_db'),
-        'USER': os.getenv('DB_USER', 'portal_app_user'),
-        'PASSWORD': os.getenv('DB_PASSWORD', ''),
-        'HOST': os.getenv('DB_HOST', 'localhost'),
-        'PORT': os.getenv('DB_PORT', '5432'),
-        'CONN_MAX_AGE': 600,
-        'OPTIONS': {
-            'sslmode': 'prefer',
-        },
-    }
+# --- Secrets & hosts ------------------------------------------------------------------------------
+if not SECRET_KEY or len(SECRET_KEY) < 50 or len(set(SECRET_KEY)) < 10 or "insecure" in SECRET_KEY.lower():
+    raise ImproperlyConfigured("DJANGO_SECRET_KEY must be set to a random value of at least 50 characters.")
+if not ALLOWED_HOSTS or "*" in ALLOWED_HOSTS:
+    raise ImproperlyConfigured("DJANGO_ALLOWED_HOSTS must list the exact production host names (no '*').")
+if DJANGO_ADMIN_ENABLED:
+    raise ImproperlyConfigured(
+        "DJANGO_ADMIN_ENABLED must not be set in production: the stock admin bypasses MFA, policies and audit."
+    )
+
+CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
+for origin in CSRF_TRUSTED_ORIGINS:
+    if not origin.startswith("https://"):
+        raise ImproperlyConfigured("DJANGO_CSRF_TRUSTED_ORIGINS entries must be https:// origins.")
+
+# --- Database: PostgreSQL only, encrypted by default, never the superuser -------------------------
+DATABASES = {"default": database_from_env()}
+if DATABASES["default"]["ENGINE"] != "django.db.backends.postgresql":
+    raise ImproperlyConfigured("Production requires PostgreSQL (DB_ENGINE=postgresql).")
+if not DATABASES["default"].get("PASSWORD"):
+    raise ImproperlyConfigured("DB_PASSWORD is required in production.")
+if DATABASES["default"]["USER"] in {"postgres", "root", "admin"}:
+    raise ImproperlyConfigured("The application must not connect as a PostgreSQL superuser account.")
+DATABASES["default"]["OPTIONS"]["sslmode"] = env_str("DB_SSLMODE", "require")
+if DATABASES["default"]["OPTIONS"]["sslmode"] in {"disable", "allow", "prefer"} and not env_bool(
+    "DB_ALLOW_INSECURE_TRANSPORT", False
+):
+    raise ImproperlyConfigured(
+        "DB_SSLMODE must be require/verify-ca/verify-full. Set DB_ALLOW_INSECURE_TRANSPORT=true only when the "
+        "database is reachable solely over a private network (e.g. the compose-internal network)."
+    )
+
+# --- Cache / rate limiting: Redis is mandatory (per-process caches cannot enforce limits) ----------
+REDIS_URL = env_str("REDIS_URL", required=True)
+CACHES = {"default": {"BACKEND": "django.core.cache.backends.redis.RedisCache", "LOCATION": REDIS_URL}}
+
+# --- HTTPS, cookies, headers ----------------------------------------------------------------------
+SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", True)
+SECURE_HSTS_SECONDS = env_int("SECURE_HSTS_SECONDS", 31_536_000, minimum=0)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool("SECURE_HSTS_INCLUDE_SUBDOMAINS", True)
+SECURE_HSTS_PRELOAD = env_bool("SECURE_HSTS_PRELOAD", False)  # opt in deliberately; preload is hard to undo
+# W021 only says "preload not enabled"; that is a documented deliberate choice (DEPLOYMENT.md).
+SILENCED_SYSTEM_CHECKS = [] if SECURE_HSTS_PRELOAD else ["security.W021"]
+SECURE_REDIRECT_EXEMPT = [r"^healthz$"]  # internal container health probe over plain HTTP
+
+# Only trust X-Forwarded-Proto when a known reverse proxy sits in front (it overwrites the header).
+if TRUSTED_PROXY_COUNT > 0:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_NAME = "__Host-portal_session"
+CSRF_COOKIE_NAME = "__Host-portal_csrf"
+
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
 }
 
-# Production Cache with Redis
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-        'LOCATION': os.getenv('REDIS_URL', 'redis://127.0.0.1:6379/1'),
-    }
-}
-
-# Production Security Headers & Cookies
-SECURE_SSL_REDIRECT = os.getenv('SECURE_SSL_REDIRECT', 'True').lower() in ('true', '1', 't')
-SESSION_COOKIE_SECURE = os.getenv('SESSION_COOKIE_SECURE', 'True').lower() in ('true', '1', 't')
-CSRF_COOKIE_SECURE = os.getenv('CSRF_COOKIE_SECURE', 'True').lower() in ('true', '1', 't')
-
-SECURE_HSTS_SECONDS = 31536000  # 1 year
-SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-SECURE_HSTS_PRELOAD = True
-
-SECURE_CONTENT_TYPE_NOSNIFF = True
-X_FRAME_OPTIONS = 'DENY'
-SECURE_BROWSER_XSS_FILTER = True
-SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+# --- Email ----------------------------------------------------------------------------------------
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = env_str("EMAIL_HOST", "localhost")
+EMAIL_PORT = env_int("EMAIL_PORT", 587, minimum=1, maximum=65535)
+EMAIL_HOST_USER = env_str("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = env_str("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
+EMAIL_TIMEOUT = 10
+SERVER_EMAIL = env_str("SERVER_EMAIL", "no-reply@example.test")

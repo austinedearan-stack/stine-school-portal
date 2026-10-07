@@ -1,11 +1,13 @@
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
-from apps.clubs.models import Club, ClubMembership, ClubEvent
+
+from apps.clubs.models import Club, ClubEvent, ClubMembership
 from apps.core.permissions import ROLE_STUDENT
-from apps.core.utils import log_audit_event, get_client_ip
+from apps.core.utils import get_client_ip, log_audit_event
+
 
 @login_required
 def club_directory_view(request):

@@ -1,12 +1,14 @@
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.core.exceptions import ValidationError, PermissionDenied
-from apps.hostels.models import Hostel, Room, Bed, HostelAllocation
-from apps.hostels.services import book_hostel_bed, cancel_hostel_allocation
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied, ValidationError
+from django.shortcuts import get_object_or_404, redirect, render
+
 from apps.academics.models import Semester
 from apps.core.permissions import ROLE_STUDENT
 from apps.core.utils import get_client_ip
+from apps.hostels.models import Hostel, HostelAllocation, Room
+from apps.hostels.services import book_hostel_bed, cancel_hostel_allocation
+
 
 @login_required
 def hostel_catalog_view(request):
@@ -73,7 +75,7 @@ def book_bed_view(request):
         )
     except ValidationError as e:
         messages.error(request, e.message)
-    except Exception as e:
+    except Exception:
         messages.error(request, "Unable to complete bed reservation. Please try again.")
 
     return redirect('hostels:my_hostel')

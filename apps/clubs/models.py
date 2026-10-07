@@ -1,5 +1,7 @@
 import uuid
+
 from django.db import models
+
 
 class Club(models.Model):
     CATEGORY_CHOICES = (

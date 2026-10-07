@@ -1,4 +1,5 @@
 from django.urls import path
+
 from apps.administration import views
 
 app_name = 'administration'

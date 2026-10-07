@@ -1,4 +1,5 @@
 from functools import wraps
+
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import redirect
 from rest_framework import permissions

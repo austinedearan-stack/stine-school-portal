@@ -1,7 +1,11 @@
-from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponseNotFound, HttpResponseForbidden, HttpResponseServerError, HttpResponseBadRequest
-from apps.core.permissions import ROLE_STUDENT, ROLE_STAFF, ROLE_ADMIN, ROLE_SUPERADMIN
+from django.http import HttpResponse
+from django.shortcuts import redirect, render
+from django.views.decorators.cache import never_cache
+from django.views.decorators.http import require_GET
+
+from apps.core.permissions import ROLE_ADMIN, ROLE_STAFF, ROLE_STUDENT, ROLE_SUPERADMIN
+
 
 @login_required
 def dashboard_view(request):
@@ -40,7 +44,7 @@ def student_dashboard_view(request):
             student=student,
             status='REGISTERED'
         ).select_related('unit', 'semester')
-    except Exception:
+    except Exception:  # noqa: S110 - audit S-6, fixed in Phase 4
         pass
 
     # 2. Hostel booking/allocation status
@@ -51,17 +55,17 @@ def student_dashboard_view(request):
             student=student,
             status='ACTIVE'
         ).select_related('bed__room__building__hostel').first()
-    except Exception:
+    except Exception:  # noqa: S110 - audit S-6, fixed in Phase 4
         pass
 
     # 3. Pending requests
     pending_requests = []
     try:
-        from apps.requests.models import StudentRequest
+        from apps.student_requests.models import StudentRequest
         pending_requests = StudentRequest.objects.filter(
             student=student
         ).exclude(status__in=['RESOLVED', 'CLOSED', 'CANCELLED']).order_by('-created_at')[:5]
-    except Exception:
+    except Exception:  # noqa: S110 - audit S-6, fixed in Phase 4
         pass
 
     # 4. Recent notifications
@@ -71,19 +75,20 @@ def student_dashboard_view(request):
         recent_notifications = Notification.objects.filter(
             recipient=request.user
         ).order_by('-created_at')[:5]
-    except Exception:
+    except Exception:  # noqa: S110 - audit S-6, fixed in Phase 4
         pass
 
     # 5. Targeted announcements
     announcements = []
     try:
-        from apps.notifications.models import Announcement
         from django.utils import timezone
+
+        from apps.notifications.models import Announcement
         announcements = Announcement.objects.filter(
             is_published=True,
             publish_date__lte=timezone.now()
         ).order_by('-publish_date')[:5]
-    except Exception:
+    except Exception:  # noqa: S110 - audit S-6, fixed in Phase 4
         pass
 
     # 6. Club memberships
@@ -94,7 +99,7 @@ def student_dashboard_view(request):
             student=student,
             status='APPROVED'
         ).select_related('club')[:5]
-    except Exception:
+    except Exception:  # noqa: S110 - audit S-6, fixed in Phase 4
         pass
 
     # 7. Timetable entries for student's current registered units
@@ -105,7 +110,7 @@ def student_dashboard_view(request):
         timetable_summary = TimetableEntry.objects.filter(
             unit_id__in=unit_ids
         ).select_related('unit', 'classroom', 'lecturer').order_by('day_of_week', 'start_time')[:6]
-    except Exception:
+    except Exception:  # noqa: S110 - audit S-6, fixed in Phase 4
         pass
 
     context = {
@@ -135,4 +140,21 @@ def not_found_view(request, exception=None):
     return render(request, 'errors/404.html', {'message': 'The requested page or resource could not be found.'}, status=404)
 
 def server_error_view(request):
-    return render(request, 'errors/500.html', {'message': 'An internal system error occurred. Security telemetry has been recorded.'}, status=500)
+    # Rendered without the request context: context processors may touch the database, which may be
+    # the very thing that failed. The standalone template contains no technical details.
+    from django.http import HttpResponseServerError
+    from django.template import loader
+
+    return HttpResponseServerError(loader.get_template('errors/500.html').render({}))
+
+
+def csrf_failure_view(request, reason=""):
+    """CSRF failures get the generic 403 page; the technical reason is never shown to the user."""
+    return render(request, 'errors/403.html', {'message': 'Your request could not be verified. Please reload the page and try again.'}, status=403)
+
+
+@never_cache
+@require_GET
+def health_view(request):
+    """Liveness probe for the container orchestrator. Reveals nothing about the system."""
+    return HttpResponse("ok", content_type="text/plain")

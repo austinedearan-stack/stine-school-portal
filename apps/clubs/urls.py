@@ -1,4 +1,5 @@
 from django.urls import path
+
 from apps.clubs import views
 
 app_name = 'clubs'

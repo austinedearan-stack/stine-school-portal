@@ -1,5 +1,6 @@
 from django.urls import path
-from apps.requests import views
+
+from apps.student_requests import views
 
 app_name = 'requests'
 

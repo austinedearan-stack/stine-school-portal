@@ -1,9 +1,11 @@
-from django.db import transaction
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.utils import timezone
-from apps.hostels.models import Bed, HostelAllocation
+
 from apps.academics.models import Semester
 from apps.core.utils import log_audit_event
+from apps.hostels.models import Bed, HostelAllocation
+
 
 def book_hostel_bed(student_profile, bed_id, semester_id, actor=None, ip_address=None):
     """
@@ -16,12 +18,12 @@ def book_hostel_bed(student_profile, bed_id, semester_id, actor=None, ip_address
         try:
             bed = Bed.objects.select_for_update().select_related('room__building__hostel').get(id=bed_id)
         except Bed.DoesNotExist:
-            raise ValidationError("Specified bed was not found.")
+            raise ValidationError("Specified bed was not found.") from None
 
         try:
             semester = Semester.objects.get(id=semester_id)
         except Semester.DoesNotExist:
-            raise ValidationError("Academic semester was not found.")
+            raise ValidationError("Academic semester was not found.") from None
 
         # 1. Availability check
         if bed.is_occupied or bed.status != 'AVAILABLE':
@@ -95,7 +97,7 @@ def cancel_hostel_allocation(student_profile, allocation_id, actor=None, ip_addr
                 status='ACTIVE'
             )
         except HostelAllocation.DoesNotExist:
-            raise ValidationError("Active hostel allocation not found.")
+            raise ValidationError("Active hostel allocation not found.") from None
 
         bed = Bed.objects.select_for_update().get(id=allocation.bed_id)
         bed.is_occupied = False

@@ -1,7 +1,7 @@
 import os
 import uuid
+
 from django.core.exceptions import ValidationError
-from django.utils.text import slugify
 
 # Permitted extensions and MIME signatures
 ALLOWED_IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png'}
@@ -41,14 +41,11 @@ def secure_filename(filename: str, prefix: str = 'file') -> str:
     return f"{prefix}_{uuid.uuid4().hex}{ext}"
 
 
-def get_client_ip(request) -> str:
-    """
-    Safely retrieves the client's IP address from the request headers.
-    """
-    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-    if x_forwarded_for:
-        return x_forwarded_for.split(',')[0].strip()
-    return request.META.get('REMOTE_ADDR', '')
+def get_client_ip(request):
+    """Backward-compatible wrapper; see apps.core.net.get_client_ip (trusted-proxy aware)."""
+    from apps.core.net import get_client_ip as _get_client_ip
+
+    return _get_client_ip(request)
 
 
 def validate_file_security(uploaded_file, allowed_extensions, allowed_mimes, max_size_bytes):

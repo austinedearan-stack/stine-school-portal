@@ -1,12 +1,15 @@
 import secrets
 import string
+
 import pyotp
-from django.contrib.auth import login, logout
-from django.contrib.auth.hashers import make_password, check_password
+from django.contrib.auth import login
+from django.contrib.auth.hashers import check_password, make_password
 from django.utils import timezone
-from apps.accounts.models import User, MFABackupCode
-from apps.core.utils import get_client_ip, log_security_event, log_audit_event
+
+from apps.accounts.models import MFABackupCode, User
 from apps.core.permissions import ADMIN_ROLES
+from apps.core.utils import get_client_ip, log_audit_event, log_security_event
+
 
 def generate_totp_secret() -> str:
     return pyotp.random_base32()

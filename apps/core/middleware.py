@@ -1,8 +1,9 @@
-import time
 from django.core.cache import cache
 from django.http import HttpResponse
 from django.template.loader import render_to_string
+
 from apps.core.utils import get_client_ip, log_security_event
+
 
 class SecurityHeadersMiddleware:
     """
@@ -13,7 +14,7 @@ class SecurityHeadersMiddleware:
 
     def __call__(self, request):
         response = self.get_response(request)
-        
+
         # CSP Header
         csp_directives = [
             "default-src 'self'",
@@ -30,7 +31,7 @@ class SecurityHeadersMiddleware:
         response['X-Frame-Options'] = 'DENY'
         response['Referrer-Policy'] = 'strict-origin-when-cross-origin'
         response['Permissions-Policy'] = 'camera=(), microphone=(), geolocation=()'
-        
+
         return response
 
 

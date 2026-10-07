@@ -1,10 +1,12 @@
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.utils import timezone
+from django.contrib.auth.decorators import login_required
 from django.db.models import Q
-from apps.notifications.models import Notification, Announcement
-from apps.core.permissions import ROLE_STUDENT, ROLE_STAFF, ADMIN_ROLES
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
+
+from apps.core.permissions import ADMIN_ROLES, ROLE_STAFF, ROLE_STUDENT
+from apps.notifications.models import Announcement, Notification
+
 
 @login_required
 def notification_list_view(request):

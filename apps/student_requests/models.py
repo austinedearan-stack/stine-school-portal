@@ -1,7 +1,10 @@
 import uuid
-from django.db import models
+
 from django.conf import settings
+from django.db import models
+
 from apps.core.utils import secure_filename
+
 
 def request_attachment_path(instance, filename):
     safe_name = secure_filename(filename, prefix='req_att')
@@ -67,10 +70,11 @@ class StudentRequest(models.Model):
 
     @classmethod
     def generate_ticket_number(cls):
-        from django.utils import timezone
         import random
+
+        from django.utils import timezone
         year = timezone.now().year
-        rand = random.randint(1000, 9999)
+        rand = random.randint(1000, 9999)  # noqa: S311 - audit F-4, fixed in Phase 9
         unique_id = uuid.uuid4().hex[:4].upper()
         return f"REQ-{year}-{rand}{unique_id}"
 
@@ -139,8 +143,9 @@ class TransferRequest(models.Model):
 
     @classmethod
     def generate_ticket_number(cls):
-        from django.utils import timezone
         import random
+
+        from django.utils import timezone
         year = timezone.now().year
-        rand = random.randint(1000, 9999)
+        rand = random.randint(1000, 9999)  # noqa: S311 - audit F-4, fixed in Phase 9
         return f"TRF-{year}-{rand}"

@@ -1,8 +1,11 @@
 import uuid
+
+from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
-from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 from django.utils import timezone
+
 from apps.core.utils import secure_filename
+
 
 def student_photo_path(instance, filename):
     safe_name = secure_filename(filename, prefix='student_avatar')
@@ -109,7 +112,7 @@ class StudentProfile(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='student_profile')
     student_id = models.CharField(max_length=30, unique=True, db_index=True)
-    
+
     # Read-Only Institutional Information
     program = models.ForeignKey('academics.Program', on_delete=models.PROTECT, related_name='students')
     admission_date = models.DateField(default=timezone.now)
@@ -160,3 +163,6 @@ class MFABackupCode(models.Model):
         indexes = [
             models.Index(fields=['user', 'is_used']),
         ]
+
+    def __str__(self):
+        return f"Backup code for {self.user_id} ({'used' if self.is_used else 'unused'})"

@@ -1,9 +1,9 @@
-from collections import defaultdict
-from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
-from apps.timetable.models import TimetableEntry, Classroom
+from django.shortcuts import redirect, render
+
 from apps.academics.models import Semester, UnitRegistration
 from apps.core.permissions import ROLE_STUDENT
+from apps.timetable.models import TimetableEntry
 
 DAYS_ORDER = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
 DAY_LABELS = {

@@ -1,6 +1,7 @@
 import uuid
+
 from django.db import models
-from django.db.models import Q
+
 
 class Hostel(models.Model):
     GENDER_POLICY_CHOICES = (
