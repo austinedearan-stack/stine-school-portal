@@ -23,7 +23,7 @@ Phase 1 delivered:
   capability catalog + authorization matrix, request state machine, STRIDE threat model, phase plan)
   and `DATABASE.md` (ERD, constraints, locking order, append-only audit design).
 * Foundation evaluation: `docs/REPOSITORY_EVALUATION.md` (8 open-source projects; none safe to fork).
-* Audit of the inherited code: `docs/AUDIT_EXISTING_CODE.md` (39 findings, each scheduled to a phase).
+* Audit of the inherited code: `docs/AUDIT_EXISTING_CODE.md` (41 findings, each scheduled to a phase).
 * Hardened foundation: Django 5.2 LTS with pinned dependencies; environment-only secrets with
   fail-fast production settings; trusted-proxy-aware client IP; stock Django admin unmounted;
   public media serving removed; containment of the critical MFA-enrollment bypass; JSON logging

@@ -23,6 +23,8 @@ lands (see `ARCHITECTURE.md` §9). ✅ = fixed in Phase 1 with a regression test
 | S-5 | Pinned to `Django>=5.0,<5.2`; Django 5.0 and 5.1 are end-of-life. `gunicorn` is used by the Dockerfile but is not in `requirements.txt`. Dependencies unpinned. | ✅ 1 (Django 5.2 LTS, pinned) |
 | S-6 | Many views swallow every exception (`except Exception: pass`), hiding real defects. | 4–11 |
 | S-7 | Role checks are string comparisons scattered across views (`request.user.role != 'STUDENT'`) rather than the central policy layer the spec requires. | 3 |
+| S-8 | **Admins can never finish logging in.** `mfa_verify_view` returns the tuple from `complete_user_login()` instead of an HTTP response, so the correct TOTP code crashes the request (`TypeError`) after the session is already logged in (found by runtime probe). | 3 |
+| S-9 | First-time MFA enrollment calls `verify_totp()` on an unsaved throw-away `User`, which **inserts a blank, active STUDENT account** (username `''`) on every enrollment; the second admin to enroll then hits a unique-constraint error (found by runtime probe). | 3 |
 
 ## 2. Authentication
 
@@ -76,7 +78,26 @@ lands (see `ARCHITECTURE.md` §9). ✅ = fixed in Phase 1 with a regression test
 | I-6 | L | `CSRF_COOKIE_HTTPONLY=False` without need; `SECURE_BROWSER_XSS_FILTER` (obsolete header). | ✅ 1 |
 | I-7 | L | Production DB `sslmode=prefer` (silently falls back to plaintext). | ✅ 1 (`require` by default, configurable) |
 
-## 6. Kept from the existing code (after review)
+## 6. Runtime smoke probe (2026-10-07, PostgreSQL 16)
+
+Every inherited route was requested as anonymous, student, staff and admin with fake data
+(throw-away script, not committed). Result:
+
+| Area | What happens today |
+|---|---|
+| Login / logout / password-change pages | Student and staff login and logout work. Admin login crashes at the MFA step (S-8). Password reset only shows a message (A-4). |
+| Student dashboard, profile, profile edit | Render (200) |
+| Units: catalogue, detail, my units, register | Render; registration persists a row |
+| Timetable: student, master | Render |
+| Hostels: catalogue, rooms, my hostel, book | Render; booking persists an allocation |
+| Clubs | Directory renders; join persists but auto-approves (Z-7); club detail and "my clubs" crash (S-3) |
+| Requests & transfers | Create via POST persists rows; every request page crashes — list, create form, detail, transfer form (S-3) |
+| Notifications & announcements | All pages crash (S-3); no notification is ever created by student actions |
+| Staff dashboard | Crashes (S-3) |
+| Admin panel (dashboard, requests, transfers, users, audit logs) | Unreachable (S-8); with a forced login every page crashes (S-3) |
+| Authorization spot checks | Student → admin URLs: 403; anonymous → protected pages: redirect to login |
+
+## 7. Kept from the existing code (after review)
 
 * Custom `User` model with UUID PKs and an explicit `role` field (extended in Phase 2/3).
 * App decomposition (core, accounts, academics, timetable, hostels, clubs, requests, notifications, administration).
