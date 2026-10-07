@@ -66,6 +66,16 @@ Markers: `postgres` (requires PostgreSQL — skipped on SQLite), `slow`.
 * Manual check in a browser against a local development server with seeded fake data: sign-in, student dashboard
   and profile render with the self-hosted stylesheet and no CSP violations in the console.
 
+## Phase 5 results (2026-10-08)
+
+* 247 passed, 5 skipped (PostgreSQL-only) on SQLite. `tests/academics/test_registration.py` (33): every registration
+  rule, drop/deadline/minimum credits, override, grading, and view-level IDOR/CSRF/role checks.
+* `tests/academics/test_registration_races.py` (3, PostgreSQL only): last seat, credit limit and double submit with
+  real threads and a barrier. **Not run in this environment (no PostgreSQL); they run in CI.**
+* Hygiene guard: `select_for_update()` combined with `select_related()` must use `of=("self",)` — otherwise
+  PostgreSQL also locks joined rows (program, semester) and serialises unrelated registrations. Found and fixed
+  during this phase before it shipped.
+
 ## Required categories (spec §35) — coverage plan
 
 | Category | Phase(s) |

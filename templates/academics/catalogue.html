@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Unit catalogue{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div><h1>Unit catalogue</h1><p>{% if semester %}{{ semester }}{% if semester.registration_opens_at %} · registration {{ semester.registration_opens_at|date:"j M" }}–{{ semester.registration_closes_at|date:"j M Y" }}{% endif %}{% else %}No current semester{% endif %}</p></div>
+  {% if user.role == "STUDENT" %}<a class="btn btn-secondary" href="{% url 'academics:my_units' %}">My units</a>{% endif %}
+</div>
+<form method="get" class="filters card">
+  {% for field in form %}<div class="field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}</div>{% endfor %}
+  <button class="btn" type="submit">Filter</button>
+</form>
+<div class="card">
+  {% if page.object_list %}
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Code</th><th>Title</th><th>Credits</th><th>Level</th><th>Department</th><th>Lecturer</th><th>Seats</th><th></th></tr></thead>
+    <tbody>
+    {% for o in page.object_list %}
+      <tr>
+        <td class="mono">{{ o.unit.code }}{% if o.section != "A" %}/{{ o.section }}{% endif %}</td>
+        <td><a href="{% url 'academics:offering_detail' o.pk %}">{{ o.unit.title }}</a></td>
+        <td>{{ o.unit.credit_hours }}</td>
+        <td>{{ o.unit.level }}</td>
+        <td>{{ o.unit.department.code }}</td>
+        <td>{{ o.lecturer.user.full_name|default:"TBA" }}</td>
+        <td>{{ o.taken }}/{{ o.capacity }}{% if o.taken >= o.capacity %} <span class="badge badge-err">Full</span>{% endif %}</td>
+        <td>{% if o.pk in registered %}<span class="badge badge-ok">Registered</span>{% elif o.status == "CLOSED" %}<span class="badge">Closed</span>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% include "partials/pagination.html" %}
+  {% else %}<p class="empty">No units match your search.</p>{% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}My teaching{% endblock %}
+{% block content %}
+<div class="page-header"><div><h1>My teaching</h1><p>{{ semester|default:"No current semester" }}</p></div></div>
+<section class="card">
+  <h2>This semester</h2>
+  {% if offerings %}
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Unit</th><th>Section</th><th>Capacity</th><th></th></tr></thead>
+    <tbody>{% for o in offerings %}<tr>
+      <td>{{ o.unit.code }} {{ o.unit.title }}</td><td>{{ o.section }}</td><td>{{ o.capacity }}</td>
+      <td><a class="btn btn-secondary btn-small" href="{% url 'academics:class_list' o.pk %}">Class list</a></td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  {% else %}<p class="empty">No offerings assigned to you this semester.</p>{% endif %}
+</section>
+{% if past %}
+<section class="card">
+  <h2>Earlier semesters</h2>
+  <ul>{% for o in past %}<li><a href="{% url 'academics:class_list' o.pk %}">{{ o.unit.code }} {{ o.unit.title }}</a> · {{ o.semester }}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+{% endblock %}

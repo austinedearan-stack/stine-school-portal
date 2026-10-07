@@ -12,7 +12,7 @@ the project brief, with the server — not the browser — enforcing every secur
 | 2 | Models & migrations (schema of `DATABASE.md`) | **Done** — see below |
 | 3 | Authentication & authorization | **Done** — see below |
 | 4 | Student dashboard & profile | **Done** — see below |
-| 5 | Units & registration | Not started |
+| 5 | Units & registration | **Done** — see below |
 | 6 | Timetable | Not started |
 | 7 | Hostels | Not started |
 | 8 | Clubs & societies | Not started |
@@ -23,6 +23,19 @@ the project brief, with the server — not the browser — enforcing every secur
 
 **This is not yet a usable portal.** The inherited code was audited and several critical issues
 were found; until each feature phase is complete and tested, treat every feature as unfinished.
+
+Phase 5 delivered:
+
+* Unit catalogue for the current semester with search, department/level filters and pagination; offering pages show
+  prerequisites, schedule, seats and the student's eligibility.
+* Registration service enforcing, under row locks (student, then offering) with the partial unique index as backstop:
+  registration window, offering status, academic/disciplinary status, program restriction, minimum year,
+  prerequisites (passed), capacity, per-semester credit limit, one section per unit, timetable clashes.
+  Drop until the add/drop deadline with the minimum-credit rule. Notifications and audit for every change.
+* Registrar override (`manage_students`): outside the window only, every other rule still applies, reason mandatory
+  and audited.
+* Lecturers: "My teaching" and class lists for their own offerings; grade entry with `record_grades` (own offerings,
+  first entry only); amendments with `manage_grades`, audited with before/after. Students see results in their history.
 
 Phase 4 delivered:
 

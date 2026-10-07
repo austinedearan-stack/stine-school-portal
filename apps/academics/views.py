@@ -1,164 +1,195 @@
+"""Unit catalogue, registration, teaching lists and grading (Phase 5)."""
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import PermissionDenied, ValidationError
-from django.db.models import Q
-from django.shortcuts import get_object_or_404, redirect, render
+from django.core.paginator import Paginator
+from django.http import Http404
+from django.shortcuts import redirect, render
+from django.utils import timezone
+from django.views.decorators.http import require_http_methods, require_POST
 
-from apps.academics.models import Department, Semester, Unit, UnitRegistration
-from apps.academics.services import drop_student_unit, register_student_unit
-from apps.core.permissions import ROLE_STUDENT
-from apps.core.utils import get_client_ip
+from apps.academics import selectors, services
+from apps.academics.forms import CatalogueFilterForm, GradeForm, OverrideForm
+from apps.academics.models import RegistrationStatus, UnitOffering, UnitRegistration
+from apps.accounts.models import StudentProfile
+from apps.core.authz import deny, get_in_scope_or_404, is_allowed
+from apps.core.authz.decorators import role_required
+from apps.core.capabilities import Role
+from apps.core.context import RequestContext
+
+PAGE_SIZE = 25
+
+
+def _student(request):
+    return getattr(request.user, "student_profile", None) if request.user.role == Role.STUDENT else None
 
 
 @login_required
-def unit_catalog_view(request):
-    """
-    Unit catalog with search, department filters, and seat availability.
-    """
-    query = request.GET.get('q', '').strip()
-    department_code = request.GET.get('dept', '').strip()
-
-    units = Unit.objects.filter(is_active=True).select_related('department', 'lecturer__user').prefetch_related('prerequisite_links__prerequisite')
-
-    if query:
-        units = units.filter(Q(code__icontains=query) | Q(name__icontains=query))
-    if department_code:
-        units = units.filter(department__code=department_code)
-
-    departments = Department.objects.all()
-    current_semester = Semester.objects.filter(is_current=True).first()
-
-    # Pre-fetch registered unit IDs if student
-    registered_unit_ids = set()
-    if request.user.role == ROLE_STUDENT and hasattr(request.user, 'student_profile') and current_semester:
-        registered_unit_ids = set(
-            UnitRegistration.objects.filter(
-                student=request.user.student_profile,
-                semester=current_semester,
-                status='REGISTERED'
-            ).values_list('unit_id', flat=True)
-        )
-
-    return render(request, 'academics/catalog.html', {
-        'units': units,
-        'departments': departments,
-        'selected_dept': department_code,
-        'query': query,
-        'current_semester': current_semester,
-        'registered_unit_ids': registered_unit_ids,
+def catalogue_view(request):
+    semester = selectors.current_semester()
+    form = CatalogueFilterForm(request.GET or None)
+    filters = form.cleaned_data if form.is_valid() else {}
+    offerings = selectors.catalogue(semester, query=(filters.get("q") or "").strip(),
+                                    department=filters.get("department"), level=filters.get("level"))
+    page = Paginator(offerings, PAGE_SIZE).get_page(request.GET.get("page"))
+    student = _student(request)
+    registered = set()
+    if student is not None and semester is not None:
+        registered = set(selectors.registrations_for_student(student, semester).values_list("offering_id", flat=True))
+    query = request.GET.copy()
+    query.pop("page", None)
+    return render(request, "academics/catalogue.html", {
+        "semester": semester, "form": form, "page": page, "registered": registered, "query": query.urlencode(),
     })
 
 
 @login_required
-def unit_detail_view(request, unit_code):
-    unit = get_object_or_404(
-        Unit.objects.select_related('department', 'lecturer__user').prefetch_related('prerequisite_links__prerequisite'),
-        code=unit_code
-    )
-    current_semester = Semester.objects.filter(is_current=True).first()
-    is_registered = False
+def offering_detail_view(request, offering_id):
+    offering = get_in_scope_or_404(request.user, "can_browse_units", selectors.browsable_offerings(),
+                                   pk=offering_id)
+    student = _student(request)
+    context = {
+        "offering": offering,
+        "unit": offering.unit,
+        "prerequisites": [link.prerequisite for link in offering.unit.prerequisite_links.select_related("prerequisite")],
+        "entries": offering.timetable_entries.select_related("venue").order_by("day_of_week", "start_time"),
+        "taken": selectors.seats_taken(offering),
+        "eligible_programs": list(offering.eligible_programs.all()),
+        "can_override": is_allowed(request.user, "can_override_registration"),
+        "override_form": OverrideForm(),
+        "can_view_class_list": is_allowed(request.user, "can_view_class_list", offering),
+    }
+    if student is not None:
+        context["registration"] = UnitRegistration.objects.filter(
+            student=student, offering=offering, status=RegistrationStatus.REGISTERED).first()
+        context["problems"] = services.eligibility_problems(student, offering)
+    return render(request, "academics/offering_detail.html", context)
 
-    if request.user.role == ROLE_STUDENT and hasattr(request.user, 'student_profile') and current_semester:
-        is_registered = UnitRegistration.objects.filter(
-            student=request.user.student_profile,
-            unit=unit,
-            semester=current_semester,
-            status='REGISTERED'
-        ).exists()
 
-    return render(request, 'academics/unit_detail.html', {
-        'unit': unit,
-        'current_semester': current_semester,
-        'is_registered': is_registered,
-    })
-
-
-@login_required
-def register_unit_view(request):
-    """
-    POST handler for student unit registration.
-    Enforces authorization, CSRF, and atomic race-condition safety.
-    """
-    if request.method != 'POST':
-        return redirect('academics:catalog')
-
-    if request.user.role != ROLE_STUDENT or not hasattr(request.user, 'student_profile'):
-        raise PermissionDenied("Only authenticated students can register for units.")
-
-    unit_id = request.POST.get('unit_id')
-    current_semester = Semester.objects.filter(is_current=True).first()
-
-    if not current_semester:
-        messages.error(request, "No active academic semester is currently configured for registration.")
-        return redirect('academics:catalog')
-
+@role_required(Role.STUDENT)
+@require_POST
+def register_view(request, offering_id):
+    student = _student(request)
+    if student is None:
+        raise Http404
+    offering = get_in_scope_or_404(request.user, "can_browse_units", selectors.browsable_offerings(),
+                                   pk=offering_id)
     try:
-        register_student_unit(
-            student_profile=request.user.student_profile,
-            unit_id=unit_id,
-            semester_id=current_semester.id,
-            actor=request.user,
-            ip_address=get_client_ip(request)
-        )
-        messages.success(request, "Successfully registered for unit!")
-    except ValidationError as e:
-        messages.error(request, e.message)
-    except Exception:
-        messages.error(request, "An unexpected error occurred during registration. Please try again.")
-
-    return redirect('academics:my_units')
+        services.register(request.user, student, offering, RequestContext.from_request(request))
+        messages.success(request, f"You are registered for {offering.unit.code}.")
+    except services.RegistrationError as exc:
+        messages.error(request, exc.messages[0])
+    return redirect("academics:offering_detail", offering_id=offering.pk)
 
 
-@login_required
-def drop_unit_view(request):
-    if request.method != 'POST':
-        return redirect('academics:my_units')
-
-    if request.user.role != ROLE_STUDENT or not hasattr(request.user, 'student_profile'):
-        raise PermissionDenied("Only students can drop units.")
-
-    registration_id = request.POST.get('registration_id')
-
-    try:
-        drop_student_unit(
-            student_profile=request.user.student_profile,
-            registration_id=registration_id,
-            actor=request.user,
-            ip_address=get_client_ip(request)
-        )
-        messages.success(request, "Unit dropped successfully.")
-    except ValidationError as e:
-        messages.error(request, e.message)
-    except Exception:
-        messages.error(request, "Unable to drop unit at this time.")
-
-    return redirect('academics:my_units')
-
-
-@login_required
+@role_required(Role.STUDENT)
 def my_units_view(request):
-    if request.user.role != ROLE_STUDENT or not hasattr(request.user, 'student_profile'):
-        return redirect('core:dashboard')
-
-    current_semester = Semester.objects.filter(is_current=True).first()
-
-    current_registrations = UnitRegistration.objects.filter(
-        student=request.user.student_profile,
-        semester=current_semester,
-        status='REGISTERED'
-    ).select_related('unit__department', 'unit__lecturer__user') if current_semester else []
-
-    total_current_credits = sum(reg.unit.credit_hours for reg in current_registrations)
-
-    past_registrations = UnitRegistration.objects.filter(
-        student=request.user.student_profile
-    ).exclude(
-        semester=current_semester
-    ).select_related('unit', 'semester') if current_semester else UnitRegistration.objects.filter(student=request.user.student_profile)
-
-    return render(request, 'academics/my_units.html', {
-        'current_registrations': current_registrations,
-        'past_registrations': past_registrations,
-        'current_semester': current_semester,
-        'total_current_credits': total_current_credits,
+    student = _student(request)
+    if student is None:
+        raise Http404
+    semester = selectors.current_semester()
+    current = list(selectors.registrations_for_student(student, semester)) if semester else []
+    return render(request, "academics/my_units.html", {
+        "semester": semester,
+        "current": [r for r in current if r.status == RegistrationStatus.REGISTERED],
+        "credits": sum(r.unit.credit_hours for r in current if r.status == RegistrationStatus.REGISTERED),
+        "history": selectors.history_for_student(student).exclude(semester=semester) if semester else
+        selectors.history_for_student(student),
+        "program": student.program,
+        "drop_open": semester is not None and timezone.now() <= semester.add_drop_deadline,
     })
+
+
+@role_required(Role.STUDENT)
+@require_POST
+def drop_view(request, registration_id):
+    student = _student(request)
+    if student is None:
+        raise Http404
+    # Only the student's own registrations are even looked up (another student's id is a 404).
+    registration = UnitRegistration.objects.filter(pk=registration_id, student=student).first()
+    if registration is None:
+        raise Http404
+    try:
+        services.drop(request.user, registration, RequestContext.from_request(request))
+        messages.success(request, f"{registration.unit.code} was dropped.")
+    except services.RegistrationError as exc:
+        messages.error(request, exc.messages[0])
+    return redirect("academics:my_units")
+
+
+@role_required(Role.STAFF)
+def my_teaching_view(request):
+    staff = getattr(request.user, "staff_profile", None)
+    semester = selectors.current_semester()
+    return render(request, "academics/my_teaching.html", {
+        "semester": semester,
+        "offerings": selectors.teaching_offerings(staff, semester),
+        "past": selectors.teaching_offerings(staff).exclude(semester=semester) if semester else [],
+    })
+
+
+@login_required
+def class_list_view(request, offering_id):
+    ctx = RequestContext.from_request(request)
+    offering = get_in_scope_or_404(request.user, "can_view_class_list",
+                                   UnitOffering.objects.select_related("unit", "semester", "lecturer__user"),
+                                   ctx=ctx, pk=offering_id)
+    registrations = list(selectors.class_list(offering))
+    can_grade = bool(registrations) and is_allowed(request.user, "can_record_grade", registrations[0])
+    return render(request, "academics/class_list.html", {
+        "offering": offering, "registrations": registrations, "can_grade": can_grade, "grade_form": GradeForm(),
+    })
+
+
+@login_required
+@require_POST
+def record_grade_view(request, registration_id):
+    ctx = RequestContext.from_request(request)
+    registration = get_in_scope_or_404(request.user, "can_record_grade",
+                                       UnitRegistration.objects.select_related("offering__lecturer", "unit"),
+                                       ctx=ctx, pk=registration_id)
+    form = GradeForm(request.POST)
+    if form.is_valid() and form.cleaned_data["grade"]:
+        try:
+            services.record_grade(request.user, registration, form.cleaned_data["grade"], ctx)
+            messages.success(request, f"Grade recorded for {registration.student.student_number}.")
+        except services.RegistrationError as exc:
+            messages.error(request, exc.messages[0])
+    else:
+        messages.error(request, "Choose a grade.")
+    return redirect("academics:class_list", offering_id=registration.offering_id)
+
+
+@login_required
+@require_http_methods(["POST"])
+def override_view(request, offering_id):
+    """Registrar registers or drops a student outside the window (other rules still apply; reason audited)."""
+    ctx = RequestContext.from_request(request)
+    if not is_allowed(request.user, "can_override_registration"):
+        deny(request.user, "can_override_registration", ctx=ctx)
+    offering = get_in_scope_or_404(request.user, "can_browse_units", selectors.browsable_offerings(),
+                                   pk=offering_id)
+    form = OverrideForm(request.POST)
+    if not form.is_valid():
+        messages.error(request, "Enter the student number and a reason.")
+        return redirect("academics:offering_detail", offering_id=offering.pk)
+    student = StudentProfile.objects.filter(student_number__iexact=form.cleaned_data["student_number"].strip()).first()
+    if student is None:
+        messages.error(request, "No student with that number.")
+        return redirect("academics:offering_detail", offering_id=offering.pk)
+    reason = form.cleaned_data["reason"]
+    try:
+        if request.POST.get("action") == "drop":
+            registration = UnitRegistration.objects.filter(student=student, offering=offering,
+                                                           status=RegistrationStatus.REGISTERED).first()
+            if registration is None:
+                raise services.RegistrationError("That student is not registered for this offering.")
+            services.drop(request.user, registration, ctx, override_reason=reason)
+            messages.success(request, f"{student.student_number} was dropped from {offering.unit.code}.")
+        else:
+            services.register(request.user, student, offering, ctx, override_reason=reason)
+            messages.success(request, f"{student.student_number} was registered for {offering.unit.code}.")
+    except services.RegistrationError as exc:
+        messages.error(request, exc.messages[0])
+    return redirect("academics:offering_detail", offering_id=offering.pk)

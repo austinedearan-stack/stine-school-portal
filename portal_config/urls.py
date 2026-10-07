@@ -7,6 +7,7 @@ urlpatterns = [
     path("healthz", health_view, name="health"),
     path("", include("apps.core.urls")),
     path("accounts/", include("apps.accounts.urls")),
+    path("academics/", include("apps.academics.urls")),
     # Feature modules are mounted as each is rebuilt on the Phase 2 schema (phases 4-11).
 ]
 

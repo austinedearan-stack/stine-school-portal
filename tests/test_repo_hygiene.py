@@ -73,3 +73,23 @@ def test_templates_have_no_inline_script_or_style():
     pattern = re.compile(r"<script(?![^>]*\bsrc=)|\son[a-z]+\s*=|\sstyle\s*=|<style", re.IGNORECASE)
     offenders = [str(p.relative_to(ROOT)) for p in (ROOT / "templates").rglob("*.html") if pattern.search(p.read_text())]
     assert offenders == []
+
+
+def test_row_locks_with_joins_lock_only_the_intended_row():
+    """``select_for_update()`` + ``select_related()`` locks every joined row on PostgreSQL (e.g. the semester),
+    serialising unrelated requests. Such locks must use ``of=("self",)``."""
+    import re
+
+    offenders = []
+    for path in (ROOT / "apps").rglob("*.py"):
+        rel = path.relative_to(ROOT).as_posix()
+        if rel in UNMOUNTED_LEGACY:
+            continue
+        for match in re.finditer(r"select_for_update\(([^)]*)\)\s*\.select_related\(", path.read_text()):
+            if "of=" not in match.group(1):
+                offenders.append(rel)
+    assert offenders == []
+
+
+# Inherited modules that are not mounted and are replaced in their feature phase (hostels: Phase 7).
+UNMOUNTED_LEGACY = {"apps/hostels/services.py", "apps/hostels/views.py"}

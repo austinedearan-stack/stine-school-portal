@@ -43,3 +43,50 @@ def teaching_offerings(staff, semester=None):
     if semester is not None:
         qs = qs.filter(semester=semester)
     return qs.order_by("unit__code", "section")
+
+
+def catalogue(semester, *, query: str = "", department=None, level=None):
+    """Offerings students can browse: open/closed (not draft or cancelled) offerings of active units."""
+    from django.db.models import Count, Q
+
+    if semester is None:
+        return UnitOffering.objects.none()
+    qs = (
+        UnitOffering.objects.filter(semester=semester, unit__is_active=True,
+                                    status__in=[OfferingStatus.OPEN, OfferingStatus.CLOSED])
+        .select_related("unit__department", "lecturer__user")
+        .annotate(taken=Count("registrations", filter=Q(registrations__status=RegistrationStatus.REGISTERED)))
+    )
+    if query:
+        qs = qs.filter(Q(unit__code__icontains=query) | Q(unit__title__icontains=query))
+    if department is not None:
+        qs = qs.filter(unit__department=department)
+    if level:
+        qs = qs.filter(unit__level=level)
+    return qs.order_by("unit__code", "section")
+
+
+def browsable_offerings():
+    return UnitOffering.objects.exclude(status__in=[OfferingStatus.DRAFT, OfferingStatus.CANCELLED]).select_related(
+        "unit__department", "semester", "lecturer__user")
+
+
+def seats_taken(offering) -> int:
+    return offering.registrations.filter(status=RegistrationStatus.REGISTERED).count()
+
+
+def class_list(offering):
+    return (
+        UnitRegistration.objects.filter(offering=offering)
+        .exclude(status=RegistrationStatus.DROPPED)
+        .select_related("student__user", "student__program")
+        .order_by("student__student_number")
+    )
+
+
+def history_for_student(student):
+    return (
+        UnitRegistration.objects.filter(student=student)
+        .select_related("offering__unit", "semester__academic_year")
+        .order_by("-semester__start_date", "offering__unit__code")
+    )

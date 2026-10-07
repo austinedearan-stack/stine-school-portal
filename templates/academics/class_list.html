@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Class list {{ offering.unit.code }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div><h1>Class list · {{ offering.unit.code }}</h1><p>{{ offering.unit.title }} · {{ offering.semester }} · section {{ offering.section }} · {{ registrations|length }} student{{ registrations|length|pluralize }}</p></div>
+  <a class="btn btn-secondary" href="{% url 'academics:offering_detail' offering.pk %}">Offering</a>
+</div>
+<div class="card">
+  {% if registrations %}
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Student number</th><th>Name</th><th>Program</th><th>Status</th><th>Grade</th>{% if can_grade %}<th>Record grade</th>{% endif %}</tr></thead>
+    <tbody>{% for r in registrations %}<tr>
+      <td class="mono"><a href="{% url 'accounts:student_detail' r.student_id %}">{{ r.student.student_number }}</a></td>
+      <td>{{ r.student.user.full_name }}</td>
+      <td>{{ r.student.program.code }}</td>
+      <td><span class="badge">{{ r.get_status_display }}</span></td>
+      <td>{{ r.grade|default:"–" }}</td>
+      {% if can_grade %}<td>
+        <form method="post" action="{% url 'academics:record_grade' r.pk %}" class="row">{% csrf_token %}
+          {{ grade_form.grade }}<button class="btn btn-small" type="submit">Save</button>
+        </form>
+      </td>{% endif %}
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  {% else %}<p class="empty">No students are registered.</p>{% endif %}
+</div>
+{% endblock %}

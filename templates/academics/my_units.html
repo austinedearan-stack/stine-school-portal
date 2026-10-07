@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}My units{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div><h1>My units</h1><p>{% if semester %}{{ semester }} · {{ credits }} credit hours (allowed {{ program.min_credits_per_semester }}–{{ program.max_credits_per_semester }}){% endif %}</p></div>
+  <a class="btn" href="{% url 'academics:catalog' %}">Browse catalogue</a>
+</div>
+<section class="card">
+  <h2>This semester</h2>
+  {% if current %}
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Code</th><th>Title</th><th>Credits</th><th>Lecturer</th><th>Grade</th><th></th></tr></thead>
+    <tbody>{% for r in current %}<tr>
+      <td class="mono">{{ r.unit.code }}</td>
+      <td><a href="{% url 'academics:offering_detail' r.offering_id %}">{{ r.offering.unit.title }}</a></td>
+      <td>{{ r.unit.credit_hours }}</td>
+      <td>{{ r.offering.lecturer.user.full_name|default:"TBA" }}</td>
+      <td>{{ r.grade|default:"–" }}</td>
+      <td>{% if drop_open %}<form method="post" action="{% url 'academics:drop' r.pk %}" class="inline">{% csrf_token %}<button class="btn btn-secondary btn-small" type="submit">Drop</button></form>{% endif %}</td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  {% else %}<p class="empty">You have not registered for any units this semester.</p>{% endif %}
+</section>
+<section class="card">
+  <h2>Academic history</h2>
+  {% if history %}
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Semester</th><th>Code</th><th>Title</th><th>Status</th><th>Grade</th></tr></thead>
+    <tbody>{% for r in history %}<tr>
+      <td>{{ r.semester }}</td><td class="mono">{{ r.offering.unit.code }}</td><td>{{ r.offering.unit.title }}</td>
+      <td><span class="badge">{{ r.get_status_display }}</span></td><td>{{ r.grade|default:"–" }}</td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  {% else %}<p class="empty">No earlier registrations.</p>{% endif %}
+</section>
+{% endblock %}

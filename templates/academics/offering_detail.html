@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}{{ unit.code }} {{ unit.title }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div><h1>{{ unit.code }} · {{ unit.title }}</h1><p>{{ unit.department.name }} · {{ offering.semester }} · section {{ offering.section }}</p></div>
+  <a class="btn btn-secondary" href="{% url 'academics:catalog' %}">Back to catalogue</a>
+</div>
+<div class="grid grid-2">
+  <section class="card">
+    <h2>About this unit</h2>
+    <p class="prewrap">{{ unit.description|default:"No description." }}</p>
+    <dl class="details">
+      <dt>Credit hours</dt><dd>{{ unit.credit_hours }}</dd>
+      <dt>Level</dt><dd>{{ unit.level }}</dd>
+      <dt>Lecturer</dt><dd>{{ offering.lecturer.user.full_name|default:"To be announced" }}</dd>
+      <dt>Seats</dt><dd>{{ taken }} of {{ offering.capacity }} taken</dd>
+      <dt>Status</dt><dd><span class="badge">{{ offering.get_status_display }}</span></dd>
+      <dt>Prerequisites</dt><dd>{% for p in prerequisites %}<span class="badge">{{ p.code }}</span> {% empty %}None{% endfor %}</dd>
+      <dt>Minimum year</dt><dd>{{ offering.min_year }}</dd>
+      <dt>Programs</dt><dd>{% for p in eligible_programs %}<span class="badge">{{ p.code }}</span> {% empty %}Open to all programs{% endfor %}</dd>
+    </dl>
+  </section>
+  <section class="card">
+    <h2>Schedule</h2>
+    {% for e in entries %}<div class="tt-slot">{{ e.get_day_of_week_display }} {{ e.start_time|time:"H:i" }}–{{ e.end_time|time:"H:i" }} · {{ e.get_class_type_display }} · {{ e.venue.name }}</div>
+    {% empty %}<p class="empty">Not scheduled yet.</p>{% endfor %}
+  </section>
+  {% if user.role == "STUDENT" %}
+  <section class="card">
+    <h2>Registration</h2>
+    {% if registration %}
+      <p><span class="badge badge-ok">You are registered</span></p>
+      <form method="post" action="{% url 'academics:drop' registration.pk %}">{% csrf_token %}<button class="btn btn-danger" type="submit">Drop this unit</button></form>
+    {% elif problems %}
+      <ul>{% for p in problems %}<li>{{ p }}</li>{% endfor %}</ul>
+    {% else %}
+      <form method="post" action="{% url 'academics:register' offering.pk %}">{% csrf_token %}<button class="btn" type="submit">Register for {{ unit.code }}</button></form>
+      <p class="small muted">Capacity, credit limit and timetable clashes are checked when you submit.</p>
+    {% endif %}
+  </section>
+  {% endif %}
+  {% if can_view_class_list %}
+  <section class="card"><h2>Class list</h2><a class="btn btn-secondary" href="{% url 'academics:class_list' offering.pk %}">View class list</a></section>
+  {% endif %}
+  {% if can_override %}
+  <section class="card">
+    <h2>Registrar override</h2>
+    <p class="small muted">Registers or drops a student outside the registration window. Prerequisites, capacity and credit limits still apply.</p>
+    <form method="post" action="{% url 'academics:override' offering.pk %}" class="form">
+      {% csrf_token %}
+      {% with form=override_form %}{% include "partials/form.html" %}{% endwith %}
+      <button class="btn" type="submit" name="action" value="register">Register student</button>
+      <button class="btn btn-danger" type="submit" name="action" value="drop">Drop student</button>
+    </form>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

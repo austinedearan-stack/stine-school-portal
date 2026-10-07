@@ -77,11 +77,6 @@ def can_change_roles(actor, target) -> bool:
     return has_capability(actor, "manage_roles") and (target is None or target.pk != actor.pk)
 
 
-@policy("can_view_own_profile")
-def can_view_own_profile(actor, obj=None) -> bool:
-    return True
-
-
 # --- Students & profiles (audit Z-3: least privilege for student data) ------------------------------
 
 
@@ -121,3 +116,42 @@ def can_edit_student_profile(actor, student) -> bool:
 @policy("can_view_profile_photo")
 def can_view_profile_photo(actor, stored_file) -> bool:
     return stored_file.owner_id == actor.pk or has_capability(actor, "manage_students")
+
+
+# --- Units & registration -------------------------------------------------------------------------
+
+
+@policy("can_browse_units")
+def can_browse_units(actor, offering=None) -> bool:
+    """Every signed-in user may browse the catalogue (draft/cancelled offerings are filtered by the selector)."""
+    return True
+
+
+@policy("can_register_units")
+def can_register_units(actor, student) -> bool:
+    """Students register and drop only for themselves."""
+    return actor.role == Role.STUDENT and student is not None and student.user_id == actor.pk
+
+
+@policy("can_override_registration")
+def can_override_registration(actor, student) -> bool:
+    """Registrar override on a student's behalf (window waived; every other rule still applies)."""
+    return has_capability(actor, "manage_students") and (student is None or student.user_id != actor.pk)
+
+
+def _teaches(actor, offering) -> bool:
+    staff = getattr(actor, "staff_profile", None)
+    return actor.role == Role.STAFF and staff is not None and offering.lecturer_id == staff.pk
+
+
+@policy("can_view_class_list")
+def can_view_class_list(actor, offering) -> bool:
+    return _teaches(actor, offering) or any(
+        has_capability(actor, c) for c in ("manage_units", "manage_students", "manage_grades"))
+
+
+@policy("can_record_grade")
+def can_record_grade(actor, registration) -> bool:
+    if has_capability(actor, "manage_grades"):
+        return True
+    return has_capability(actor, "record_grades") and _teaches(actor, registration.offering)
