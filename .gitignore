@@ -69,3 +69,6 @@ var/
 *.dump
 *.backup
 backups/
+
+# Transfer bundles
+*.bundle
