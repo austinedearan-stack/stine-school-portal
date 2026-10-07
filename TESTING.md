@@ -95,6 +95,17 @@ Markers: `postgres` (requires PostgreSQL — skipped on SQLite), `slow`.
   officers without approval rights, self-action refusal, officer-vs-officer removal, appointment rules and
   self-promotion, advisor reassignment, event visibility and notifications, member-list privacy, id-guessing.
 
+## Phase 9 results (2026-10-08)
+
+* 325 passed, 9 skipped (PostgreSQL-only). `tests/requests/test_requests.py` (30 + 1 PostgreSQL): numbering,
+  routing/priority, visibility by role and department, queue scope, the state machine (owner, reviewer, approver,
+  invalid jumps, arbitrary POSTed statuses), internal notes, attachment limits/access/malicious PDF, assignment
+  scope, transfers (approval vs execution, separation of duties, once-only, snapshot check, auto-close exemption).
+* `test_request_numbering_race.py` (PostgreSQL): parallel submissions get distinct sequential numbers.
+* Design note: the independent `audit` connection (D16) is switched off in the test suite by default
+  (`AUDIT_INDEPENDENT_CONNECTION=False`) and enabled per test, so ordinary tests are not blocked by pytest-django's
+  per-database access guard; the PostgreSQL test proves a refused transition's audit row survives the rollback.
+
 ## Required categories (spec §35) — coverage plan
 
 | Category | Phase(s) |

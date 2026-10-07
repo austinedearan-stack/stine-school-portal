@@ -37,7 +37,8 @@ NAV_ITEMS = [
     NavItem("Clubs & societies", "clubs:directory", "Services"),
     NavItem("My clubs", "clubs:my_clubs", "Services", roles=(Role.STUDENT,)),
     NavItem("My requests", "requests:my_requests", "Services", roles=(Role.STUDENT,)),
-    NavItem("Request queue", "requests:queue", "Services", any_capability=("review_requests",)),
+    NavItem("Request queue", "requests:queue", "Services", any_capability=(
+        "review_requests", "review_all_requests", "approve_requests", "approve_transfers", "execute_transfers")),
     NavItem("Announcements", "notifications:announcements", "Services"),
     NavItem("Notifications", "notifications:list", "Services"),
     NavItem("Admin dashboard", "administration:dashboard", "Administration", any_capability=("view_statistics",)),

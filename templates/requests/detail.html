@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}{{ req.number }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div><h1><span class="mono">{{ req.number }}</span> · {{ req.subject }}</h1>
+    <p>{{ req.category.name }} · <span class="badge badge-info">{{ req.get_status_display }}</span> · submitted {{ req.created_at|date:"j M Y H:i" }}</p></div>
+  <a class="btn btn-secondary" href="{% if staff_view %}{% url 'requests:queue' %}{% else %}{% url 'requests:my_requests' %}{% endif %}">Back</a>
+</div>
+<div class="grid grid-2">
+  <section class="card">
+    <h2>Request</h2>
+    <p class="prewrap">{{ req.description }}</p>
+    <dl class="details">
+      {% if staff_view %}<dt>Student</dt><dd><a href="{% url 'accounts:student_detail' req.student_id %}">{{ req.student.user.full_name }} ({{ req.student.student_number }})</a> · {{ req.student.program.code }}</dd>{% endif %}
+      <dt>Priority</dt><dd>{{ req.get_priority_display }}</dd>
+      <dt>Department</dt><dd>{{ req.department.name|default:"–" }}</dd>
+      <dt>Assigned to</dt><dd>{{ req.assigned_to.user.full_name|default:"Not yet assigned" }}</dd>
+      {% if req.decided_by %}<dt>Decision</dt><dd>{{ req.get_status_display }} by {{ req.decided_by.full_name }} on {{ req.decided_at|date:"j M Y" }}</dd>{% endif %}
+      {% if req.resolution %}<dt>Resolution</dt><dd class="prewrap">{{ req.resolution }}</dd>{% endif %}
+    </dl>
+    {% if transfer %}
+      <h3 class="mt">Transfer</h3>
+      <dl class="details">
+        <dt>Type</dt><dd>{{ transfer.get_transfer_type_display }}</dd>
+        <dt>From</dt><dd>{{ transfer.from_program.name }} · {{ transfer.from_department.name }} · {{ transfer.from_campus }}</dd>
+        <dt>To</dt><dd>{% if transfer.to_program %}{{ transfer.to_program.name }}{% elif transfer.to_department %}{{ transfer.to_department.name }}{% else %}{{ transfer.to_campus }}{% endif %}</dd>
+        <dt>Executed</dt><dd>{% if transfer.executed_at %}{{ transfer.executed_at|date:"j M Y H:i" }} by {{ transfer.executed_by.full_name }}{% else %}Not yet{% endif %}</dd>
+      </dl>
+    {% endif %}
+    {% if attachments %}
+      <h3 class="mt">Attachments</h3>
+      <ul>{% for a in attachments %}<li><a href="{% url 'requests:attachment' a.pk %}">{{ a.file.original_name }}</a> <span class="small muted">{{ a.file.size|filesizeformat }}{% if a.visibility == "INTERNAL" %} · internal{% endif %}</span></li>{% endfor %}</ul>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2>Actions</h2>
+    {% if transition_form %}
+      <form method="post" action="{% url 'requests:transition' req.pk %}" class="form">{% csrf_token %}
+        {% with form=transition_form %}{% include "partials/form.html" %}{% endwith %}
+        <button class="btn" type="submit">Update status</button>
+      </form>
+    {% endif %}
+    {% if assign_form %}
+      <form method="post" action="{% url 'requests:assign' req.pk %}" class="form mt">{% csrf_token %}
+        {% with form=assign_form %}{% include "partials/form.html" %}{% endwith %}
+        <button class="btn btn-secondary" type="submit">Assign</button>
+      </form>
+    {% endif %}
+    {% if routing_form %}
+      <form method="post" action="{% url 'requests:routing' req.pk %}" class="form mt">{% csrf_token %}
+        {% with form=routing_form %}{% include "partials/form.html" %}{% endwith %}
+        <button class="btn btn-secondary" type="submit">Update routing</button>
+      </form>
+    {% endif %}
+    {% if can_execute %}
+      <form method="post" action="{% url 'requests:execute_transfer' req.pk %}" class="form mt">{% csrf_token %}
+        <p class="small">Applies the approved transfer to the student's academic record. This cannot be undone from here.</p>
+        {% with form=execute_form %}{% include "partials/form.html" %}{% endwith %}
+        <button class="btn btn-danger" type="submit">Execute transfer</button>
+      </form>
+    {% endif %}
+    {% if not transition_form and not assign_form and not can_execute %}<p class="empty">No actions available.</p>{% endif %}
+  </section>
+
+  <section class="card">
+    <h2>Conversation</h2>
+    {% for m in thread %}
+      <div class="tt-slot"><strong>{{ m.author.full_name }}</strong>{% if m.visibility == "INTERNAL" %} <span class="badge badge-warn">Internal</span>{% endif %} <span class="small muted">{{ m.created_at|date:"j M Y H:i" }}</span>
+        <div class="prewrap">{{ m.body }}</div></div>
+    {% empty %}<p class="empty">No messages yet.</p>{% endfor %}
+    {% if message_form %}
+      <form method="post" action="{% url 'requests:message' req.pk %}" enctype="multipart/form-data" class="form mt">{% csrf_token %}
+        {% with form=message_form %}{% include "partials/form.html" %}{% endwith %}
+        <button class="btn" type="submit">Send</button>
+      </form>
+    {% elif not req.is_open %}<p class="small muted">This request is closed; no further messages can be added.</p>{% endif %}
+  </section>
+
+  <section class="card">
+    <h2>History</h2>
+    {% for h in history %}<p class="small">{{ h.created_at|date:"j M Y H:i" }} · {% if h.from_status %}{{ h.get_from_status_display }} → {% endif %}<strong>{{ h.get_to_status_display }}</strong>{% if h.actor and staff_view %} · {{ h.actor.full_name }}{% endif %}{% if h.note %} — {{ h.note }}{% endif %}</p>{% endfor %}
+  </section>
+</div>
+{% endblock %}

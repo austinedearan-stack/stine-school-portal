@@ -1,263 +1,277 @@
-import os
+"""Student requests, review queue, transfers and request settings (Phase 9)."""
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import PermissionDenied, ValidationError
-from django.http import FileResponse, Http404
-from django.shortcuts import get_object_or_404, redirect, render
+from django.core.paginator import Paginator
+from django.db.models import Q
+from django.http import Http404
+from django.shortcuts import redirect, render
+from django.views.decorators.http import require_http_methods, require_POST
 
-from apps.academics.models import Program
-from apps.core.permissions import ROLE_STUDENT, can_view_request
-from apps.core.utils import (
-    ALLOWED_DOCUMENT_EXTENSIONS,
-    ALLOWED_DOCUMENT_MIMES,
-    MAX_ATTACHMENT_SIZE,
-    get_client_ip,
-    log_audit_event,
-    validate_file_security,
+from apps.accounts.models import StaffProfile
+from apps.core.audit import record_audit_event
+from apps.core.authz import get_in_scope_or_404, has_capability, is_allowed
+from apps.core.authz.decorators import capability_required, policy_required, role_required
+from apps.core.capabilities import Role
+from apps.core.context import RequestContext
+from apps.core.files import protected_file_response
+from apps.student_requests import selectors, services
+from apps.student_requests.forms import (
+    AssignForm,
+    CategoryForm,
+    ExecuteTransferForm,
+    MessageForm,
+    QueueFilterForm,
+    RequestForm,
+    RoutingForm,
+    TransferRequestForm,
+    TransitionForm,
 )
 from apps.student_requests.models import (
     RequestAttachment,
     RequestCategory,
-    RequestMessage,
+    RequestStatus,
     StudentRequest,
-    TransferRequest,
+    TransferType,
 )
 
 
-@login_required
-def student_request_list_view(request):
-    """
-    Lists only the calling student's requests.
-    """
-    if request.user.role != ROLE_STUDENT or not hasattr(request.user, 'student_profile'):
-        return redirect('administration:requests')
-
-    requests_qs = StudentRequest.objects.filter(
-        student=request.user.student_profile
-    ).select_related('category').order_by('-updated_at')
-
-    transfer_requests_qs = TransferRequest.objects.filter(
-        student=request.user.student_profile
-    ).select_related('current_program', 'requested_program').order_by('-created_at')
-
-    return render(request, 'requests/student_list.html', {
-        'requests': requests_qs,
-        'transfer_requests': transfer_requests_qs,
-    })
+def _student(request):
+    return getattr(request.user, "student_profile", None) if request.user.role == Role.STUDENT else None
 
 
-@login_required
-def create_request_view(request):
-    if request.user.role != ROLE_STUDENT or not hasattr(request.user, 'student_profile'):
-        raise PermissionDenied("Only students can submit student requests.")
+def _request_or_404(request, request_id):
+    return get_in_scope_or_404(
+        request.user, "can_view_request",
+        StudentRequest.objects.select_related("category", "student__user", "student__program", "assigned_to__user",
+                                              "department", "decided_by"),
+        ctx=RequestContext.from_request(request), pk=request_id)
 
-    categories = RequestCategory.objects.filter(is_active=True)
 
-    if request.method == 'POST':
-        category_id = request.POST.get('category_id')
-        subject = request.POST.get('subject', '').strip()
-        description = request.POST.get('description', '').strip()
-        priority = request.POST.get('priority', 'NORMAL')
-        uploaded_file = request.FILES.get('attachment')
+# --- Student --------------------------------------------------------------------------------------
 
-        if not subject or not description or not category_id:
-            messages.error(request, "Please fill in all required fields.")
-            return render(request, 'requests/create_request.html', {'categories': categories})
 
-        category = get_object_or_404(RequestCategory, id=category_id, is_active=True)
+@role_required(Role.STUDENT)
+def my_requests_view(request):
+    student = _student(request)
+    if student is None:
+        raise Http404
+    return render(request, "requests/my_requests.html", {
+        "page": Paginator(selectors.requests_for_student(student), 20).get_page(request.GET.get("page"))})
 
-        # Validate file if provided
-        if uploaded_file:
-            try:
-                validate_file_security(
-                    uploaded_file=uploaded_file,
-                    allowed_extensions=ALLOWED_DOCUMENT_EXTENSIONS,
-                    allowed_mimes=ALLOWED_DOCUMENT_MIMES,
-                    max_size_bytes=MAX_ATTACHMENT_SIZE
-                )
-            except ValidationError as e:
-                messages.error(request, e.message)
-                return render(request, 'requests/create_request.html', {'categories': categories})
 
-        ticket = StudentRequest.objects.create(
-            ticket_number=StudentRequest.generate_ticket_number(),
-            student=request.user.student_profile,
-            category=category,
-            subject=subject,
-            description=description,
-            priority=priority,
-            status='SUBMITTED'
-        )
+@role_required(Role.STUDENT)
+@require_http_methods(["GET", "POST"])
+def create_view(request):
+    student = _student(request)
+    if student is None:
+        raise Http404
+    form = RequestForm(request.POST or None, request.FILES or None)
+    if request.method == "POST" and form.is_valid():
+        data = form.cleaned_data
+        try:
+            req = services.submit(request.user, student, data["category"], data["subject"], data["description"],
+                                  RequestContext.from_request(request), uploads=data["attachments"])
+            messages.success(request, f"Request {req.number} submitted.")
+            return redirect("requests:detail", request_id=req.pk)
+        except services.RequestError as exc:
+            form.add_error(None, exc.messages[0])
+    return render(request, "requests/create.html", {"form": form, "title": "New request"})
 
-        if uploaded_file:
-            RequestAttachment.objects.create(
-                request=ticket,
-                file=uploaded_file,
-                original_filename=os.path.basename(uploaded_file.name),
-                uploaded_by=request.user
-            )
 
-        log_audit_event(
-            actor=request.user,
-            action='CREATE_REQUEST',
-            target_model='StudentRequest',
-            target_id=str(ticket.id),
-            changes={'ticket_number': ticket.ticket_number, 'category': category.name},
-            ip_address=get_client_ip(request),
-            details=f"Student created ticket {ticket.ticket_number}"
-        )
+@role_required(Role.STUDENT)
+@require_http_methods(["GET", "POST"])
+def transfer_create_view(request):
+    student = _student(request)
+    category = RequestCategory.objects.filter(is_transfer=True, is_active=True).first()
+    if student is None or category is None:
+        raise Http404
+    form = TransferRequestForm(request.POST or None, request.FILES or None)
+    if request.method == "POST" and form.is_valid():
+        data = form.cleaned_data
+        try:
+            req = services.submit(
+                request.user, student, category, data["subject"], data["reason"], RequestContext.from_request(request),
+                uploads=data["attachments"], transfer={k: data.get(k) for k in (
+                    "transfer_type", "to_program", "to_department", "to_campus", "reason")})
+            messages.success(request, f"Transfer request {req.number} submitted.")
+            return redirect("requests:detail", request_id=req.pk)
+        except services.RequestError as exc:
+            form.add_error(None, exc.messages[0])
+    return render(request, "requests/create.html", {
+        "form": form, "title": "Transfer request",
+        "intro": f"You are currently in {student.program.name} ({student.program.department.name}), {student.campus}."})
 
-        messages.success(request, f"Request {ticket.ticket_number} submitted successfully!")
-        return redirect('requests:detail', ticket_number=ticket.ticket_number)
 
-    return render(request, 'requests/create_request.html', {'categories': categories})
+# --- Detail and actions (owner and staff) ---------------------------------------------------------
 
 
 @login_required
-def request_detail_view(request, ticket_number):
-    """
-    IDOR-safe detail view: strictly ensures student can only access their own tickets.
-    """
-    ticket = get_object_or_404(
-        StudentRequest.objects.select_related('student__user', 'category', 'assigned_to__user'),
-        ticket_number=ticket_number
-    )
+def detail_view(request, request_id):
+    req = _request_or_404(request, request_id)
+    user = request.user
+    staff_view = req.student.user_id != user.pk
+    targets = services.available_targets(user, req)
+    can_review = is_allowed(user, "can_review_request", req)
+    transfer = getattr(req, "transfer", None) if req.category.is_transfer else None
+    context = {
+        "req": req,
+        "transfer": transfer,
+        "staff_view": staff_view,
+        "thread": selectors.thread(req, include_internal=staff_view),
+        "attachments": selectors.attachments(req, include_internal=staff_view),
+        "history": req.status_changes.select_related("actor").order_by("created_at", "seq"),
+        "message_form": MessageForm(staff_view=staff_view) if is_allowed(user, "can_reply_request", req) else None,
+        "transition_form": TransitionForm(targets=targets) if targets else None,
+        "can_review": can_review,
+        "assign_form": AssignForm(candidates=_assignees(req)) if can_review and req.is_open else None,
+        "routing_form": RoutingForm(initial={"priority": req.priority, "department": req.department}) if can_review
+        and req.is_open else None,
+        "can_execute": bool(transfer) and req.status == RequestStatus.APPROVED and transfer.executed_at is None and
+        is_allowed(user, "can_execute_transfer", req),
+    }
+    if context["can_execute"]:
+        context["execute_form"] = ExecuteTransferForm(
+            department=transfer.to_department if transfer.transfer_type == TransferType.DEPARTMENT else None)
+    return render(request, "requests/detail.html", context)
 
-    # Server-side authorization check
-    if not can_view_request(request.user, ticket):
-        raise PermissionDenied("You are not authorized to view this ticket.")
 
-    is_student_caller = (request.user.role == ROLE_STUDENT)
-
-    # Hide internal staff notes from students
-    messages_qs = ticket.messages.select_related('sender')
-    if is_student_caller:
-        messages_qs = messages_qs.filter(is_internal_note=False)
-
-    attachments = ticket.attachments.select_related('uploaded_by')
-
-    # Handle student or staff reply
-    if request.method == 'POST':
-        reply_text = request.POST.get('message', '').strip()
-        uploaded_file = request.FILES.get('attachment')
-
-        if reply_text:
-            if uploaded_file:
-                try:
-                    validate_file_security(
-                        uploaded_file=uploaded_file,
-                        allowed_extensions=ALLOWED_DOCUMENT_EXTENSIONS,
-                        allowed_mimes=ALLOWED_DOCUMENT_MIMES,
-                        max_size_bytes=MAX_ATTACHMENT_SIZE
-                    )
-                except ValidationError as e:
-                    messages.error(request, e.message)
-                    return redirect('requests:detail', ticket_number=ticket.ticket_number)
-
-            msg = RequestMessage.objects.create(
-                request=ticket,
-                sender=request.user,
-                message=reply_text,
-                is_internal_note=False
-            )
-
-            if uploaded_file:
-                RequestAttachment.objects.create(
-                    request=ticket,
-                    message=msg,
-                    file=uploaded_file,
-                    original_filename=os.path.basename(uploaded_file.name),
-                    uploaded_by=request.user
-                )
-
-            log_audit_event(
-                actor=request.user,
-                action='REPLY_REQUEST',
-                target_model='StudentRequest',
-                target_id=str(ticket.id),
-                ip_address=get_client_ip(request)
-            )
-
-            messages.success(request, "Response posted successfully.")
-            return redirect('requests:detail', ticket_number=ticket.ticket_number)
-
-    return render(request, 'requests/request_detail.html', {
-        'ticket': ticket,
-        'messages_list': messages_qs,
-        'attachments': attachments,
-        'is_student_caller': is_student_caller,
-    })
+def _assignees(req):
+    candidates = StaffProfile.objects.filter(user__is_active=True).filter(
+        Q(department_id=req.department_id) | Q(pk=req.assigned_to_id)).select_related("user")
+    return StaffProfile.objects.filter(pk__in=[s.pk for s in candidates if
+                                               has_capability(s.user, "review_requests")]).select_related("user")
 
 
 @login_required
-def download_attachment_view(request, attachment_id):
-    """
-    IDOR-safe attachment download endpoint.
-    Verifies that the caller owns the ticket or is authorized staff/admin.
-    """
-    attachment = get_object_or_404(RequestAttachment.objects.select_related('request__student'), id=attachment_id)
-
-    if not can_view_request(request.user, attachment.request):
-        raise PermissionDenied("Access to this attachment is forbidden.")
-
-    if not attachment.file or not os.path.exists(attachment.file.path):
-        raise Http404("File not found on server.")
-
-    response = FileResponse(open(attachment.file.path, 'rb'))
-    response['Content-Disposition'] = f'attachment; filename="{attachment.original_filename}"'
-    return response
+@require_POST
+def message_view(request, request_id):
+    req = _request_or_404(request, request_id)
+    staff_view = req.student.user_id != request.user.pk
+    form = MessageForm(request.POST, request.FILES, staff_view=staff_view)
+    if form.is_valid():
+        try:
+            services.add_message(request.user, req, form.cleaned_data["body"], RequestContext.from_request(request),
+                                 internal=form.cleaned_data.get("internal", False),
+                                 uploads=form.cleaned_data["attachments"])
+            messages.success(request, "Message posted.")
+        except services.RequestError as exc:
+            messages.error(request, exc.messages[0])
+    else:
+        messages.error(request, "Write a message (and check any attachments).")
+    return redirect("requests:detail", request_id=req.pk)
 
 
 @login_required
-def create_transfer_request_view(request):
-    """
-    Dedicated university transfer request workflow.
-    """
-    if request.user.role != ROLE_STUDENT or not hasattr(request.user, 'student_profile'):
-        raise PermissionDenied("Only active students may submit program transfers.")
+@require_POST
+def transition_view(request, request_id):
+    req = _request_or_404(request, request_id)
+    target, note = request.POST.get("target", ""), request.POST.get("note", "")
+    try:
+        services.transition(request.user, req, target, note, RequestContext.from_request(request))
+        messages.success(request, "Status updated.")
+    except services.RequestError as exc:
+        messages.error(request, exc.messages[0])
+    return redirect("requests:detail", request_id=req.pk)
 
-    student = request.user.student_profile
-    programs = Program.objects.exclude(id=student.program_id)
 
-    if request.method == 'POST':
-        transfer_type = request.POST.get('transfer_type', 'PROGRAM')
-        requested_program_id = request.POST.get('requested_program_id')
-        reason = request.POST.get('reason', '').strip()
+@login_required
+@require_POST
+def assign_view(request, request_id):
+    req = _request_or_404(request, request_id)
+    form = AssignForm(request.POST, candidates=_assignees(req))
+    if form.is_valid():
+        try:
+            services.assign(request.user, req, form.cleaned_data["assignee"], RequestContext.from_request(request))
+            messages.success(request, "Assignment saved.")
+        except services.RequestError as exc:
+            messages.error(request, exc.messages[0])
+    else:
+        messages.error(request, "Choose a reviewer from the list.")
+    return redirect("requests:detail", request_id=req.pk)
 
-        if not requested_program_id or not reason:
-            messages.error(request, "Please select target program and explain your reason for transfer.")
-            return render(request, 'requests/create_transfer.html', {'student': student, 'programs': programs})
 
-        requested_program = get_object_or_404(Program, id=requested_program_id)
+@login_required
+@require_POST
+def routing_view(request, request_id):
+    req = _request_or_404(request, request_id)
+    form = RoutingForm(request.POST)
+    if form.is_valid():
+        services.set_priority_and_department(request.user, req, form.cleaned_data["priority"],
+                                             form.cleaned_data["department"], RequestContext.from_request(request))
+        messages.success(request, "Routing updated.")
+    return redirect("requests:detail", request_id=req.pk)
 
-        transfer = TransferRequest.objects.create(
-            ticket_number=TransferRequest.generate_ticket_number(),
-            student=student,
-            transfer_type=transfer_type,
-            current_program=student.program,
-            requested_program=requested_program,
-            reason=reason,
-            status='SUBMITTED'
-        )
 
-        log_audit_event(
-            actor=request.user,
-            action='CREATE_TRANSFER_REQUEST',
-            target_model='TransferRequest',
-            target_id=str(transfer.id),
-            changes={
-                'ticket_number': transfer.ticket_number,
-                'from': student.program.code,
-                'to': requested_program.code
-            },
-            ip_address=get_client_ip(request)
-        )
+@login_required
+@require_POST
+def execute_view(request, request_id):
+    req = _request_or_404(request, request_id)
+    transfer = getattr(req, "transfer", None)
+    if transfer is None:
+        raise Http404
+    form = ExecuteTransferForm(request.POST, department=transfer.to_department
+                               if transfer.transfer_type == TransferType.DEPARTMENT else None)
+    if form.is_valid():
+        try:
+            services.execute_transfer(request.user, req, RequestContext.from_request(request),
+                                      program=form.cleaned_data.get("program"))
+            messages.success(request, "Transfer applied to the student's record.")
+        except services.RequestError as exc:
+            messages.error(request, exc.messages[0])
+    return redirect("requests:detail", request_id=req.pk)
 
-        messages.success(request, f"Transfer request {transfer.ticket_number} submitted for academic board evaluation.")
-        return redirect('requests:my_requests')
 
-    return render(request, 'requests/create_transfer.html', {
-        'student': student,
-        'programs': programs,
-    })
+@login_required
+def attachment_view(request, attachment_id):
+    attachment = get_in_scope_or_404(
+        request.user, "can_download_request_file",
+        RequestAttachment.objects.select_related("request__student__user", "request__category", "file"),
+        ctx=RequestContext.from_request(request), pk=attachment_id)
+    return protected_file_response(attachment.file, as_attachment=True)
+
+
+# --- Staff queue ----------------------------------------------------------------------------------
+
+
+@policy_required("can_use_request_queue")
+def queue_view(request):
+    form = QueueFilterForm(request.GET or {"status": "open"})
+    filters = form.cleaned_data if form.is_valid() else {"status": "open"}
+    requests = selectors.queue(request.user, status=filters.get("status", "open"), category=filters.get("category"),
+                               mine=filters.get("mine", False), query=(filters.get("q") or "").strip())
+    query = request.GET.copy()
+    query.pop("page", None)
+    return render(request, "requests/queue.html", {
+        "form": form, "page": Paginator(requests, 25).get_page(request.GET.get("page")), "query": query.urlencode()})
+
+
+# --- Request settings -----------------------------------------------------------------------------
+
+
+@capability_required("manage_request_config")
+def categories_view(request):
+    return render(request, "requests/categories.html",
+                  {"categories": RequestCategory.objects.select_related("department").order_by("sort_order", "name")})
+
+
+@capability_required("manage_request_config")
+@require_http_methods(["GET", "POST"])
+def category_form_view(request, category_id=None):
+    ctx = RequestContext.from_request(request)
+    category = get_in_scope_or_404(request.user, "can_manage_request_config", RequestCategory.objects.all(), ctx=ctx,
+                                   pk=category_id) if category_id else None
+    if category is not None and category.is_transfer:
+        messages.info(request, "The transfer category's approval settings are fixed.")
+    form = CategoryForm(request.POST or None, instance=category)
+    if request.method == "POST" and form.is_valid():
+        obj = form.save(commit=False)
+        if category is not None and category.is_transfer:
+            obj.is_transfer, obj.requires_approval, obj.approval_capability = True, True, "approve_transfers"
+        obj.full_clean()
+        obj.save()
+        record_audit_event(request.user, "REQUEST_CATEGORY.SAVED", obj, ctx=ctx,
+                           changes={"fields": sorted(form.changed_data)})
+        messages.success(request, "Category saved.")
+        return redirect("requests:categories")
+    return render(request, "requests/category_form.html", {"form": form, "category": category})

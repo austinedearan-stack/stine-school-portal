@@ -24,6 +24,9 @@ if os.environ.get("DB_ENGINE", "sqlite").lower() == "postgresql":
     # Lets the test runner (as table owner) flush append-only tables between transactional tests.
     # Tests of the append-only trigger switch it off with SET LOCAL. See apps/core/db_guards.py.
     DATABASES["default"]["OPTIONS"]["options"] = "-c portal.audit_maintenance=on"
+    # Independent connection for denial/security records (D16). Off by default in tests; a test opts in with
+    # @override_settings(AUDIT_INDEPENDENT_CONNECTION=True) and django_db(databases=["default", "audit"]).
+    DATABASES["audit"] = {**DATABASES["default"], "TEST": {"MIRROR": "default"}}
 else:
     DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"}}
 
@@ -35,3 +38,5 @@ EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 EMAIL_SEND_SYNC = True  # tests inspect mail.outbox synchronously
 MEDIA_ROOT = BASE_DIR / "var" / "test-private-media"  # noqa: F405
 DJANGO_ADMIN_ENABLED = False
+
+AUDIT_INDEPENDENT_CONNECTION = False

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}My requests{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div><h1>My requests</h1><p>Ask the university for help, documents or changes, and follow the progress here.</p></div>
+  <div class="row"><a class="btn" href="{% url 'requests:create' %}">New request</a><a class="btn btn-secondary" href="{% url 'requests:create_transfer' %}">Transfer request</a></div>
+</div>
+<div class="card">
+  {% if page.object_list %}
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Number</th><th>Subject</th><th>Category</th><th>Status</th><th>Updated</th></tr></thead>
+    <tbody>{% for r in page.object_list %}<tr>
+      <td class="mono"><a href="{% url 'requests:detail' r.pk %}">{{ r.number }}</a></td>
+      <td>{{ r.subject }}</td><td>{{ r.category.name }}</td>
+      <td><span class="badge badge-info">{{ r.get_status_display }}</span></td>
+      <td>{{ r.updated_at|date:"j M Y" }}</td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  {% include "partials/pagination.html" %}
+  {% else %}<p class="empty">You have not made any requests.</p>{% endif %}
+</div>
+{% endblock %}

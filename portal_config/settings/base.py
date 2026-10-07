@@ -197,6 +197,10 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_ROOT = Path(env_str("PRIVATE_MEDIA_ROOT", str(BASE_DIR / "var" / "private-media")))
 MEDIA_URL = "/private-media-not-served/"
 
+# Requests (ARCHITECTURE.md §5.2, §5.4)
+TRANSFER_SEPARATION_OF_DUTIES = env_bool("TRANSFER_SEPARATION_OF_DUTIES", True)
+REQUEST_AUTO_CLOSE_DAYS = env_int("REQUEST_AUTO_CLOSE_DAYS", 14, minimum=1)
+
 MAX_PROFILE_PHOTO_BYTES = 2 * 1024 * 1024
 MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024
 # Optional malware scanner: dotted path to a callable(bytes) -> bool (True = clean). Off unless configured.

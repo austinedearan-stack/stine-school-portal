@@ -26,7 +26,10 @@ AUDIT_DB_ALIAS = "audit"
 
 
 def _audit_alias() -> str:
-    return AUDIT_DB_ALIAS if AUDIT_DB_ALIAS in settings.DATABASES else "default"
+    """The independent connection when configured and enabled (off in the test suite unless a test opts in)."""
+    if getattr(settings, "AUDIT_INDEPENDENT_CONNECTION", True) and AUDIT_DB_ALIAS in settings.DATABASES:
+        return AUDIT_DB_ALIAS
+    return "default"
 
 
 def _actor_fields(actor) -> dict[str, Any]:

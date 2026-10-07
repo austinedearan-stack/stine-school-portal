@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Request queue{% endblock %}
+{% block content %}
+<div class="page-header"><div><h1>Request queue</h1><p>Requests in your scope.</p></div></div>
+<form method="get" class="filters card">
+  {% for field in form %}<div class="field">{% if field.widget_type == "checkbox" %}<label>{{ field }} {{ field.label }}</label>{% else %}<label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% endif %}</div>{% endfor %}
+  <button class="btn" type="submit">Filter</button>
+</form>
+<div class="card">
+  {% if page.object_list %}
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Number</th><th>Subject</th><th>Student</th><th>Category</th><th>Priority</th><th>Status</th><th>Assignee</th><th>Created</th></tr></thead>
+    <tbody>{% for r in page.object_list %}<tr>
+      <td class="mono"><a href="{% url 'requests:detail' r.pk %}">{{ r.number }}</a></td>
+      <td>{{ r.subject }}</td>
+      <td>{{ r.student.student_number }}</td>
+      <td>{{ r.category.name }}</td>
+      <td>{% if r.priority == "URGENT" or r.priority == "HIGH" %}<span class="badge badge-err">{{ r.get_priority_display }}</span>{% else %}{{ r.get_priority_display }}{% endif %}</td>
+      <td><span class="badge badge-info">{{ r.get_status_display }}</span></td>
+      <td>{{ r.assigned_to.user.full_name|default:"–" }}</td>
+      <td>{{ r.created_at|date:"j M" }}</td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+  {% include "partials/pagination.html" %}
+  {% else %}<p class="empty">No requests match.</p>{% endif %}
+</div>
+{% endblock %}

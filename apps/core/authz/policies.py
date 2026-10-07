@@ -224,3 +224,80 @@ def can_manage_club_events(actor, club) -> bool:
 def can_act_for_student(actor, student) -> bool:
     """Self-service student actions (join/leave a club, ...): only the student themself."""
     return actor.role == Role.STUDENT and student is not None and student.user_id == actor.pk
+
+
+# --- Requests & transfers (audit Z-4, Z-5, Z-8, Z-9) -----------------------------------------------
+
+
+def _staff_of(actor):
+    return getattr(actor, "staff_profile", None) if actor.role != Role.STUDENT else None
+
+
+def _in_review_scope(actor, req) -> bool:
+    """review_requests holders see requests assigned to them or routed to their department."""
+    if has_capability(actor, "review_all_requests"):
+        return True
+    if not has_capability(actor, "review_requests"):
+        return False
+    staff = _staff_of(actor)
+    return staff is not None and (req.assigned_to_id == staff.pk or
+                                  (req.department_id is not None and req.department_id == staff.department_id))
+
+
+def _approver_in_scope(actor, req) -> bool:
+    category = req.category
+    if not category.requires_approval or not has_capability(actor, category.approval_capability):
+        return False
+    if req.student.user_id == actor.pk:
+        return False  # nobody approves their own request or transfer
+    if actor.role in Role.ADMINS:
+        return True
+    staff = _staff_of(actor)  # staff approvers (heads of department) are scoped to their department
+    return staff is not None and (req.department_id == staff.department_id or req.assigned_to_id == staff.pk)
+
+
+@policy("can_view_request")
+def can_view_request(actor, req) -> bool:
+    if req.student.user_id == actor.pk:
+        return True
+    if _in_review_scope(actor, req) or _approver_in_scope(actor, req):
+        return True
+    return req.category.is_transfer and has_capability(actor, "execute_transfers")
+
+
+@policy("can_review_request")
+def can_review_request(actor, req) -> bool:
+    """Triage, assign, request information, resolve, close, re-open."""
+    return req.student.user_id != actor.pk and _in_review_scope(actor, req)
+
+
+@policy("can_approve_request")
+def can_approve_request(actor, req) -> bool:
+    return _approver_in_scope(actor, req)
+
+
+@policy("can_execute_transfer")
+def can_execute_transfer(actor, req) -> bool:
+    return has_capability(actor, "execute_transfers") and req.student.user_id != actor.pk
+
+
+@policy("can_reply_request")
+def can_reply_request(actor, req) -> bool:
+    """Owner or in-scope staff may post while the request is open (never on CLOSED/CANCELLED, audit Z-9)."""
+    if not req.is_open:
+        return False
+    return req.student.user_id == actor.pk or can_review_request(actor, req) or _approver_in_scope(actor, req)
+
+
+@policy("can_download_request_file")
+def can_download_request_file(actor, attachment) -> bool:
+    req = attachment.request
+    if not can_view_request(actor, req):
+        return False
+    return attachment.visibility == "PUBLIC" or req.student.user_id != actor.pk
+
+
+@policy("can_use_request_queue")
+def can_use_request_queue(actor, obj=None) -> bool:
+    return any(has_capability(actor, c) for c in (
+        "review_requests", "review_all_requests", "approve_requests", "approve_transfers", "execute_transfers"))

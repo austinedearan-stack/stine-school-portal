@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Request categories{% endblock %}
+{% block content %}
+<div class="page-header"><div><h1>Request categories</h1><p>Routing, default priority and approval rules. Statuses and transitions are fixed in code.</p></div>
+  <a class="btn" href="{% url 'requests:category_create' %}">New category</a></div>
+<div class="card"><div class="table-wrap"><table class="table">
+  <thead><tr><th>Code</th><th>Name</th><th>Department</th><th>Priority</th><th>Approval</th><th>Attachments</th><th>Status</th><th></th></tr></thead>
+  <tbody>{% for c in categories %}<tr>
+    <td class="mono">{{ c.code }}</td><td>{{ c.name }}</td><td>{{ c.department.code|default:"Student's department" }}</td>
+    <td>{{ c.get_default_priority_display }}</td>
+    <td>{% if c.requires_approval %}{{ c.approval_capability }}{% else %}–{% endif %}</td>
+    <td>{% if c.allows_attachments %}up to {{ c.max_attachments }}{% else %}no{% endif %}</td>
+    <td>{% if c.is_active %}<span class="badge badge-ok">Active</span>{% else %}<span class="badge">Inactive</span>{% endif %}</td>
+    <td><a class="btn btn-secondary btn-small" href="{% url 'requests:category_edit' c.pk %}">Edit</a></td>
+  </tr>{% endfor %}</tbody>
+</table></div></div>
+{% endblock %}

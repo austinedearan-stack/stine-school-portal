@@ -16,13 +16,34 @@ the project brief, with the server — not the browser — enforcing every secur
 | 6 | Timetable | **Done** — see below |
 | 7 | Hostels | **Done** — see below |
 | 8 | Clubs & societies | **Done** — see below |
-| 9 | Requests & transfers | Not started |
+| 9 | Requests & transfers | **Done** — see below |
 | 10 | Admin panel | Not started |
 | 11 | Notifications & announcements | Not started |
 | 12–15 | Hardening, testing, adversarial testing, deployment | Not started |
 
 **This is not yet a usable portal.** The inherited code was audited and several critical issues
 were found; until each feature phase is complete and tested, treat every feature as unfinished.
+
+Phase 9 delivered:
+
+* Students submit requests by category (subject, description, attachments through the secure upload pipeline) and
+  transfer requests (program, department, faculty or campus) with a snapshot of their current record.
+  Numbers `REQ-YYYY-NNNNNN` come from a locked per-year counter (audit F-4); priority and routing department come
+  from the category, never from the student (Z-8).
+* Code-defined state machine (ARCHITECTURE.md §5.4): every transition checks who may perform it, takes a row lock,
+  writes the append-only history, an audit row and a student notification; arbitrary statuses from a POST are
+  refused and the refusal is recorded on the independent connection (Z-4). A student's reply to "needs information"
+  moves the request back to review automatically.
+* Department-scoped review queue (assigned or department; `review_all_requests` removes the scope), assignment only
+  to in-scope reviewers, rerouting, public messages and staff-only internal notes and attachments; nothing can be
+  added to closed or cancelled requests (Z-9). Attachments download only through authorization-checked views.
+* Approvals by the category's approval capability (staff approvers scoped to their department; never one's own
+  request). Approved transfers change nothing until `execute_transfers` applies them: once only, a different person
+  from the approver, and only if the student's record still matches the snapshot (Z-5). Approved, unexecuted
+  transfers are never auto-closed.
+* `manage.py close_stale_requests` closes finished requests after `REQUEST_AUTO_CLOSE_DAYS` (default 14).
+* Request settings (`manage_request_config`): categories, routing department, default priority, approval
+  requirement and attachment limits; the transfer category's approval rules are fixed.
 
 Phase 8 delivered:
 
