@@ -11,7 +11,7 @@ from django.urls import reverse
 
 from apps.accounts.models import User
 
-PASSWORD = "Adm1n!Test-Passphrase"  # test fixture only
+PASSWORD = "Adm1n!Test-Passphrase"  # test fixture only  # secret-scan: allow
 
 
 @pytest.fixture

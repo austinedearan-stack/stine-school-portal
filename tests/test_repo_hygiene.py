@@ -24,6 +24,18 @@ def test_secret_scan_detects_planted_secrets(tmp_path):
     assert module.main([str(planted)]) == 1
 
 
+def test_secret_scan_ignores_shell_required_variable_checks(tmp_path):
+    spec = importlib.util.spec_from_file_location("secret_scan3", ROOT / "scripts" / "secret_scan.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    script = tmp_path / "init.sh"
+    script.write_text(': "${DB_PASSWORD:?DB_PASSWORD required}"\n')
+    assert module.main([str(script)]) == 0
+    fake_password = "Zx9qL2v" + "B7wTq4m"
+    script.write_text("DB_PASSWORD=" + f'"{fake_password}"\n')
+    assert module.main([str(script)]) == 1
+
+
 def test_no_csrf_exempt_or_raw_sql_in_apps():
     offenders = []
     for path in (ROOT / "apps").rglob("*.py"):
