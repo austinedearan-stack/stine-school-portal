@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Academic setup{% endblock %}
+{% block content %}
+<div class="page-header"><div><h1>Academic setup</h1><p>Faculties, departments, programs, calendar, units and offerings.</p></div></div>
+<div class="grid grid-3">
+  {% for key, spec in kinds %}
+  <section class="card"><h2><a href="{% url 'administration:setup_list' key %}">{{ spec.label }}</a></h2>
+    <a class="btn btn-secondary btn-small" href="{% url 'administration:setup_create' key %}">Add</a></section>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -106,6 +106,16 @@ Markers: `postgres` (requires PostgreSQL — skipped on SQLite), `slow`.
   (`AUDIT_INDEPENDENT_CONNECTION=False`) and enabled per test, so ordinary tests are not blocked by pytest-django's
   per-database access guard; the PostgreSQL test proves a refused transition's audit row survives the rollback.
 
+## Phase 10 results (2026-10-08)
+
+* 344 passed, 9 skipped. `tests/administration/test_admin_panel.py` (19): per-page capability gating (an admin without capabilities sees
+  nothing), account creation without passwords, admin-role creation limited to `manage_roles`, audited record edits
+  and notifications, role/group changes through the UI with the ceiling enforced, MFA reset code never emailed,
+  IT support vs admin accounts, setup create/edit audit, prerequisite cycle refusal, single current semester,
+  audit-log filtering.
+* Bug found by the tests: forms used `instance.pk` to detect new objects, but UUID primary keys exist before saving;
+  fixed with `_state.adding` (and checked that no other code relies on `pk` for this).
+
 ## Required categories (spec §35) — coverage plan
 
 | Category | Phase(s) |

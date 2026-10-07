@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}{{ target.username }}{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div><h1>{{ target.full_name }}</h1><p>{{ target.username }} · {{ target.email }} · {{ target.get_role_display }}{% if not target.is_active %} · <span class="badge">Inactive</span>{% endif %}</p></div>
+  <a class="btn btn-secondary" href="{% url 'administration:users' %}">All users</a>
+</div>
+<div class="grid grid-2">
+  <section class="card">
+    <h2>Record</h2>
+    <dl class="details">
+      {% if target.student_profile %}
+        <dt>Student number</dt><dd>{{ target.student_profile.student_number }}</dd>
+        <dt>Program</dt><dd>{{ target.student_profile.program.name }}</dd>
+        <dt>Status</dt><dd>{{ target.student_profile.get_academic_status_display }}</dd>
+      {% endif %}
+      {% if target.staff_profile %}
+        <dt>Staff number</dt><dd>{{ target.staff_profile.staff_number }}</dd>
+        <dt>Department</dt><dd>{{ target.staff_profile.department.name }}</dd>
+        <dt>Title</dt><dd>{{ target.staff_profile.title|default:"–" }}</dd>
+      {% endif %}
+      <dt>Last sign-in</dt><dd>{{ target.last_login|date:"j M Y H:i"|default:"Never" }}</dd>
+      <dt>Password changed</dt><dd>{{ target.password_changed_at|date:"j M Y"|default:"–" }}{% if target.must_change_password %} · must change{% endif %}</dd>
+      <dt>Two-step verification</dt><dd>{% if device %}<span class="badge badge-ok">On</span>{% else %}<span class="badge{% if mfa_required %} badge-err{% endif %}">Off</span>{% endif %}{% if mfa_required %} · required{% endif %}</dd>
+    </dl>
+    <div class="row mt">
+      {% if can_edit_student %}<a class="btn btn-secondary btn-small" href="{% url 'administration:student_edit' target.student_profile.pk %}">Edit student record</a>{% endif %}
+      {% if can_edit_staff %}<a class="btn btn-secondary btn-small" href="{% url 'administration:staff_edit' target.staff_profile.pk %}">Edit staff record</a>{% endif %}
+    </div>
+  </section>
+
+  {% if can_manage_account %}
+  <section class="card">
+    <h2>Account actions</h2>
+    <div class="stack">
+      {% if target.is_active %}
+        <form method="post" action="{% url 'administration:user_action' target.pk 'deactivate' %}">{% csrf_token %}<button class="btn btn-danger btn-small" type="submit">Deactivate (ends all sessions)</button></form>
+      {% else %}
+        <form method="post" action="{% url 'administration:user_action' target.pk 'activate' %}">{% csrf_token %}<button class="btn btn-small" type="submit">Activate</button></form>
+      {% endif %}
+      <form method="post" action="{% url 'administration:user_action' target.pk 'reset-password' %}">{% csrf_token %}<button class="btn btn-secondary btn-small" type="submit">Send password reset code</button></form>
+      {% if device %}
+        <form method="post" action="{% url 'administration:user_action' target.pk 'reset-mfa' %}">{% csrf_token %}<button class="btn btn-secondary btn-small" type="submit">Reset two-step verification</button></form>
+      {% else %}
+        <form method="post" action="{% url 'administration:user_action' target.pk 'enrollment-code' %}">{% csrf_token %}<button class="btn btn-secondary btn-small" type="submit">Issue MFA enrollment code</button></form>
+      {% endif %}
+      <p class="small muted">Verify the person's identity out of band before resetting their authenticator.</p>
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="card">
+    <h2>Access</h2>
+    <p>{% for g in groups %}<span class="badge badge-info">{{ g.name }}</span> {% empty %}No capability groups.{% endfor %}</p>
+    <p class="small">{% for c in capabilities %}<span class="badge">{{ c }}</span> {% empty %}No effective capabilities.{% endfor %}</p>
+    {% if can_roles %}
+      <form method="post" action="{% url 'administration:user_action' target.pk 'role' %}" class="form mt">{% csrf_token %}
+        {% with form=role_form %}{% include "partials/form.html" %}{% endwith %}
+        <p class="small muted">Changing the role removes every group (no dormant grants).</p>
+        <button class="btn btn-secondary btn-small" type="submit">Change role</button>
+      </form>
+      <form method="post" action="{% url 'administration:user_action' target.pk 'groups' %}" class="form mt">{% csrf_token %}
+        <p class="small muted">Only groups whose capabilities are allowed for this role are listed.</p>
+        {% with form=groups_form %}{% include "partials/form.html" %}{% endwith %}
+        <button class="btn btn-secondary btn-small" type="submit">Save groups</button>
+      </form>
+    {% endif %}
+  </section>
+
+  {% if recent_security is not None %}
+  <section class="card">
+    <h2>Recent security events</h2>
+    {% for e in recent_security %}<p class="small">{{ e.timestamp|date:"j M H:i" }} · {{ e.get_event_type_display }} · {{ e.ip_address|default:"" }}</p>
+    {% empty %}<p class="empty">None.</p>{% endfor %}
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

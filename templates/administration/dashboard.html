@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Admin dashboard{% endblock %}
+{% block content %}
+<div class="page-header"><div><h1>Admin dashboard</h1><p>Current semester statistics and the last 24 hours of security activity.</p></div></div>
+<div class="grid grid-4">
+  <div class="stat"><div class="value">{{ stats.students }}</div><div class="label">Active students</div></div>
+  <div class="stat"><div class="value">{{ stats.staff }}</div><div class="label">Active staff</div></div>
+  <div class="stat"><div class="value">{{ stats.registrations }}</div><div class="label">Unit registrations</div></div>
+  <div class="stat"><div class="value">{{ stats.credits }}</div><div class="label">Credit hours registered</div></div>
+  <div class="stat"><div class="value">{{ stats.open_requests }}</div><div class="label">Open requests</div></div>
+  <div class="stat"><div class="value">{{ stats.beds_held }} / {{ stats.beds }}</div><div class="label">Beds allocated</div></div>
+  <div class="stat"><div class="value">{{ security.LOGIN_FAILURE|default:0 }}</div><div class="label">Failed sign-ins (24 h)</div></div>
+  <div class="stat"><div class="value">{{ security.PERMISSION_DENIED|default:0 }}</div><div class="label">Permission denials (24 h)</div></div>
+</div>
+{% if recent is not None %}
+<section class="card mt">
+  <h2>Recent activity</h2>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>When</th><th>Who</th><th>Action</th><th>Object</th><th>Outcome</th></tr></thead>
+    <tbody>{% for e in recent %}<tr><td>{{ e.timestamp|date:"j M H:i" }}</td><td>{{ e.actor_identifier }}</td><td class="mono small">{{ e.action }}</td><td class="small">{{ e.object_type }}</td><td>{{ e.outcome }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+  <a href="{% url 'administration:audit_log' %}">Full audit log</a>
+</section>
+{% endif %}
+{% endblock %}

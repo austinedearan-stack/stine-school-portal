@@ -17,12 +17,29 @@ the project brief, with the server — not the browser — enforcing every secur
 | 7 | Hostels | **Done** — see below |
 | 8 | Clubs & societies | **Done** — see below |
 | 9 | Requests & transfers | **Done** — see below |
-| 10 | Admin panel | Not started |
+| 10 | Admin panel | **Done** — see below |
 | 11 | Notifications & announcements | Not started |
 | 12–15 | Hardening, testing, adversarial testing, deployment | Not started |
 
 **This is not yet a usable portal.** The inherited code was audited and several critical issues
 were found; until each feature phase is complete and tested, treat every feature as unfinished.
+
+Phase 10 delivered:
+
+* Admin dashboard (`view_statistics`): enrolment, registrations, credit hours, open requests, bed occupancy, failed
+  sign-ins and permission denials in the last 24 hours, recent audit activity (with `view_audit_logs`).
+* Users: search by name/username/email/number, role and status; account detail with record, MFA state, groups and
+  effective capabilities. Actions follow the account-administration invariants of Phase 3: activate/deactivate
+  (ends sessions), send a password reset code, reset MFA or issue an enrollment code (shown once, never emailed),
+  role change (groups stripped) and group assignment limited to groups allowed for the role (`manage_roles`).
+* Student and staff accounts are created without a password: the person receives a one-time code and sets their
+  own (admins never set passwords). Admin/superadmin accounts only with `manage_roles`. Student and staff records
+  are edited through audited services (before/after); department changes notify the staff member.
+* Academic setup (`manage_academics` / `manage_units`): faculties, departments, programs, academic years,
+  semesters (one current), units with cycle-free prerequisites, offerings with lecturer assignment that updates the
+  timetable and re-checks clashes.
+* Audit log and security event viewers (`view_audit_logs`) with filters; both are read-only by construction.
+* With Phases 6–9 this completes the capability-gated management UIs (timetable, hostels, clubs, request settings).
 
 Phase 9 delivered:
 

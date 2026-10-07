@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Enrollment code{% endblock %}
+{% block content %}
+<div class="auth-card card">
+  <h1>Enrollment code for {{ target.username }}</h1>
+  <p>Give this code to the person <strong>in person or by phone after verifying their identity</strong>. It is shown once, is valid for 72 hours and works only together with their password.</p>
+  <p class="code-input mono">{{ code }}</p>
+  <a class="btn" href="{% url 'administration:user_detail' target.pk %}">Done</a>
+</div>
+{% endblock %}

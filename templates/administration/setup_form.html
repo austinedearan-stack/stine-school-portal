@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}{% if obj %}{{ obj }}{% else %}New{% endif %} · {{ spec.label }}{% endblock %}
+{% block content %}
+<div class="page-header"><div><h1>{% if obj %}{{ obj }}{% else %}New {{ verbose_name }}{% endif %}</h1><p>{{ spec.label }}</p></div>
+  <a class="btn btn-secondary" href="{% url 'administration:setup_list' kind %}">Back to list</a></div>
+<div class="grid grid-2">
+  <section class="card"><form method="post" class="form" novalidate>
+    {% csrf_token %}
+    {% include "partials/form.html" %}
+    <button class="btn" type="submit">Save</button>
+  </form></section>
+  {% if kind == "units" and obj %}
+  <section class="card">
+    <h2>Prerequisites</h2>
+    {% for link in prerequisites %}
+      <form method="post" action="{% url 'administration:prerequisite_remove' link.pk %}" class="row">{% csrf_token %}{{ link.prerequisite.code }} {{ link.prerequisite.title }}<button class="btn btn-secondary btn-small" type="submit">Remove</button></form>
+    {% empty %}<p class="empty">None.</p>{% endfor %}
+    <form method="post" action="{% url 'administration:prerequisite_add' obj.pk %}" class="form mt">{% csrf_token %}
+      {% with form=prereq_form %}{% include "partials/form.html" %}{% endwith %}
+      <button class="btn btn-secondary" type="submit">Add prerequisite</button></form>
+  </section>
+  {% endif %}
+  {% if lecturer_form %}
+  <section class="card">
+    <h2>Lecturer</h2>
+    <p>Currently: {{ obj.lecturer.user.full_name|default:"none" }}. Changing it updates the timetable and re-checks clashes.</p>
+    <form method="post" action="{% url 'administration:offering_lecturer' obj.pk %}" class="form">{% csrf_token %}
+      {% with form=lecturer_form %}{% include "partials/form.html" %}{% endwith %}
+      <button class="btn btn-secondary" type="submit">Set lecturer</button></form>
+  </section>
+  {% endif %}
+  {% if can_set_current %}
+  <section class="card">
+    <h2>Current semester</h2>
+    <form method="post" action="{% url 'administration:semester_current' obj.pk %}">{% csrf_token %}<button class="btn btn-secondary" type="submit">Make this the current semester</button></form>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

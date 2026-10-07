@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}{{ spec.label }}{% endblock %}
+{% block content %}
+<div class="page-header"><div><h1>{{ spec.label }}</h1></div>
+  <div class="row"><a class="btn" href="{% url 'administration:setup_create' kind %}">Add</a><a class="btn btn-secondary" href="{% url 'administration:academics' %}">Setup</a></div></div>
+<div class="card">
+  <div class="table-wrap"><table class="table">
+    <thead><tr>{% for h in headers %}<th>{{ h }}</th>{% endfor %}<th></th></tr></thead>
+    <tbody>{% for obj, values in rows %}<tr>
+      {% for v in values %}<td>{% if v is True %}Yes{% elif v is False %}No{% else %}{{ v|default:"–" }}{% endif %}</td>{% endfor %}
+      <td><a class="btn btn-secondary btn-small" href="{% url 'administration:setup_edit' kind obj.pk %}">Edit</a></td>
+    </tr>{% empty %}<tr><td class="empty" colspan="{{ headers|length|add:1 }}">Nothing yet.</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% include "partials/pagination.html" %}
+</div>
+{% endblock %}

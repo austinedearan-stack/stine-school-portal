@@ -301,3 +301,13 @@ def can_download_request_file(actor, attachment) -> bool:
 def can_use_request_queue(actor, obj=None) -> bool:
     return any(has_capability(actor, c) for c in (
         "review_requests", "review_all_requests", "approve_requests", "approve_transfers", "execute_transfers"))
+
+
+# --- Administration --------------------------------------------------------------------------------
+
+ACCOUNT_ADMIN_CAPABILITIES = ("manage_user_accounts", "manage_roles", "manage_students", "manage_staff")
+
+
+@policy("can_view_accounts")
+def can_view_accounts(actor, obj=None) -> bool:
+    return any(has_capability(actor, c) for c in ACCOUNT_ADMIN_CAPABILITIES)

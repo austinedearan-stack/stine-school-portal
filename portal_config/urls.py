@@ -12,6 +12,7 @@ urlpatterns = [
     path("hostels/", include("apps.hostels.urls")),
     path("clubs/", include("apps.clubs.urls")),
     path("requests/", include("apps.student_requests.urls")),
+    path("administration/", include("apps.administration.urls")),
     # Feature modules are mounted as each is rebuilt on the Phase 2 schema (phases 4-11).
 ]
 
