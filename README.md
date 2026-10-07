@@ -18,11 +18,27 @@ the project brief, with the server — not the browser — enforcing every secur
 | 8 | Clubs & societies | **Done** — see below |
 | 9 | Requests & transfers | **Done** — see below |
 | 10 | Admin panel | **Done** — see below |
-| 11 | Notifications & announcements | Not started |
+| 11 | Notifications & announcements | **Done** — see below |
 | 12–15 | Hardening, testing, adversarial testing, deployment | Not started |
 
-**This is not yet a usable portal.** The inherited code was audited and several critical issues
-were found; until each feature phase is complete and tested, treat every feature as unfinished.
+**All specified modules are implemented and tested (Phases 1–11).** Security hardening, the full test and
+adversarial campaigns and deployment preparation (Phases 12–15) are still to come; do not deploy to
+production before they are complete.
+
+Phase 11 delivered:
+
+* Notification inbox: own notifications only; open/mark-read and mark-all-read are POST-only (audit Z-10); links are
+  route names resolved from an allowlist at display time (no stored URLs, no open redirect). Notifications are
+  produced by every module (registration, timetable changes, hostel offers, club decisions, request progress,
+  security changes).
+* Announcements targeted by role audience (everyone / students / staff) AND scope (university, faculty, department,
+  program, unit offering, club, named individuals); visibility is decided in one selector and enforced on the list,
+  detail page, attachments and dashboard (audit Z-1, Z-2). Drafts, future-dated and expired items are hidden.
+* Publishing with `publish_announcements`: admins any scope; staff only their own department, their own offerings,
+  clubs they advise, or named students registered in their own offerings. Publishing notifies exactly the audience,
+  once; future-dated items are delivered by `manage.py publish_due_announcements`. Authors or admin publishers withdraw.
+* Optional email copies (`NOTIFICATION_EMAIL_KINDS`) through an outbox sent by `manage.py send_outbox`, with retries.
+* All feature modules (Phases 4–11) are now rebuilt on the Phase 2 schema and mounted; no inherited view remains.
 
 Phase 10 delivered:
 

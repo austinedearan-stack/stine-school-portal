@@ -41,6 +41,7 @@ NAV_ITEMS = [
         "review_requests", "review_all_requests", "approve_requests", "approve_transfers", "execute_transfers")),
     NavItem("Announcements", "notifications:announcements", "Services"),
     NavItem("Notifications", "notifications:list", "Services"),
+    NavItem("Publish announcements", "notifications:manage", "Services", any_capability=("publish_announcements",)),
     NavItem("Admin dashboard", "administration:dashboard", "Administration", any_capability=("view_statistics",)),
     NavItem("Users", "administration:users", "Administration",
             any_capability=("manage_user_accounts", "manage_roles", "manage_students", "manage_staff")),

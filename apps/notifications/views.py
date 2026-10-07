@@ -1,79 +1,113 @@
+"""Notification inbox and announcements (Phase 11)."""
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Q
-from django.shortcuts import get_object_or_404, redirect, render
-from django.utils import timezone
+from django.core.exceptions import ValidationError
+from django.core.paginator import Paginator
+from django.http import Http404
+from django.shortcuts import redirect, render
+from django.views.decorators.http import require_http_methods, require_POST
 
-from apps.core.permissions import ADMIN_ROLES, ROLE_STAFF, ROLE_STUDENT
-from apps.notifications.models import Announcement, Notification
-
-
-@login_required
-def notification_list_view(request):
-    notifications = Notification.objects.filter(recipient=request.user).order_by('-created_at')
-
-    # Optional: mark one notification as read if requested via GET param
-    mark_id = request.GET.get('read')
-    if mark_id:
-        Notification.objects.filter(id=mark_id, recipient=request.user).update(is_read=True)
-        return redirect('notifications:list')
-
-    return render(request, 'notifications/notification_list.html', {
-        'notifications': notifications,
-    })
+from apps.core.authz import get_in_scope_or_404, has_capability, is_allowed
+from apps.core.authz.decorators import capability_required
+from apps.core.capabilities import Role
+from apps.core.context import RequestContext
+from apps.core.files import protected_file_response
+from apps.notifications import selectors, services
+from apps.notifications.forms import AnnouncementForm
+from apps.notifications.models import Announcement, AnnouncementAttachment, AnnouncementStatus
 
 
 @login_required
+def inbox_view(request):
+    page = Paginator(selectors.notifications_for(request.user), 25).get_page(request.GET.get("page"))
+    items = [(n, services.link_for(n)) for n in page.object_list]
+    return render(request, "notifications/inbox.html", {"page": page, "items": items})
+
+
+@login_required
+@require_POST
+def open_view(request, notification_id):
+    """Mark read (state change, so POST - audit Z-10) and go to the notification's internal link."""
+    notification = services.mark_read(request.user, notification_id)
+    if notification is None:
+        raise Http404
+    return redirect(services.link_for(notification) or "notifications:list")
+
+
+@login_required
+@require_POST
 def mark_all_read_view(request):
-    if request.method == 'POST':
-        Notification.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
-        messages.success(request, "All notifications marked as read.")
-    return redirect('notifications:list')
+    count = services.mark_all_read(request.user)
+    messages.success(request, f"Marked {count} notification{'s' if count != 1 else ''} as read.")
+    return redirect("notifications:list")
+
+
+# --- Announcements --------------------------------------------------------------------------------
 
 
 @login_required
-def announcement_list_view(request):
-    """
-    Renders announcements matching the caller's authorized audience.
-    """
-    now = timezone.now()
-    qs = Announcement.objects.filter(
-        is_published=True,
-        publish_date__lte=now
-    ).filter(
-        Q(expiration_date__isnull=True) | Q(expiration_date__gte=now)
-    )
-
-    if request.user.role in ADMIN_ROLES:
-        # Admins can view all announcements
-        pass
-    elif request.user.role == ROLE_STUDENT and hasattr(request.user, 'student_profile'):
-        student = request.user.student_profile
-        qs = qs.filter(
-            Q(audience='ALL') |
-            Q(audience='STUDENTS') |
-            Q(department=student.program.department) |
-            Q(faculty=student.program.department.faculty)
-        )
-    elif request.user.role == ROLE_STAFF and hasattr(request.user, 'staff_profile'):
-        staff = request.user.staff_profile
-        qs = qs.filter(
-            Q(audience='ALL') |
-            Q(audience='STAFF') |
-            Q(department=staff.department) |
-            Q(faculty=staff.department.faculty)
-        )
-    else:
-        qs = qs.filter(audience='ALL')
-
-    return render(request, 'notifications/announcement_list.html', {
-        'announcements': qs.select_related('author'),
-    })
+def announcements_view(request):
+    page = Paginator(selectors.visible_announcements(request.user), 20).get_page(request.GET.get("page"))
+    return render(request, "notifications/announcements.html", {
+        "page": page, "can_publish": has_capability(request.user, "publish_announcements")})
 
 
 @login_required
-def announcement_detail_view(request, announcement_id):
-    announcement = get_object_or_404(Announcement, id=announcement_id, is_published=True)
-    return render(request, 'notifications/announcement_detail.html', {
-        'announcement': announcement,
-    })
+def announcement_view(request, announcement_id):
+    announcement = get_in_scope_or_404(request.user, "can_view_announcement",
+                                       Announcement.objects.select_related("author"),
+                                       ctx=RequestContext.from_request(request), pk=announcement_id)
+    return render(request, "notifications/announcement.html", {
+        "announcement": announcement, "attachments": announcement.attachments.select_related("file"),
+        "can_manage": is_allowed(request.user, "can_manage_announcement", announcement)})
+
+
+@login_required
+def announcement_attachment_view(request, attachment_id):
+    attachment = AnnouncementAttachment.objects.select_related("announcement", "file").filter(pk=attachment_id).first()
+    if attachment is None or not is_allowed(request.user, "can_view_announcement", attachment.announcement):
+        raise Http404
+    return protected_file_response(attachment.file, as_attachment=True)
+
+
+@capability_required("publish_announcements")
+@require_http_methods(["GET", "POST"])
+def announcement_form_view(request, announcement_id=None):
+    ctx = RequestContext.from_request(request)
+    announcement = get_in_scope_or_404(request.user, "can_manage_announcement", Announcement.objects.all(), ctx=ctx,
+                                       pk=announcement_id) if announcement_id else None
+    if announcement is not None and announcement.status == AnnouncementStatus.WITHDRAWN:
+        messages.error(request, "Withdrawn announcements cannot be edited.")
+        return redirect("notifications:announcement", announcement_id=announcement.pk)
+    form = AnnouncementForm(request.POST or None, request.FILES or None, instance=announcement, user=request.user)
+    if request.method == "POST" and form.is_valid():
+        try:
+            saved = services.save_announcement(request.user, form.save(commit=False), ctx, recipients=form.recipients,
+                                               uploads=form.cleaned_data["attachments"],
+                                               publish=request.POST.get("action") == "publish")
+            messages.success(request, "Announcement published." if saved.status == AnnouncementStatus.PUBLISHED
+                             else "Draft saved.")
+            return redirect("notifications:announcement", announcement_id=saved.pk)
+        except ValidationError as exc:
+            form.add_error(None, exc.messages[0])
+    return render(request, "notifications/announcement_form.html", {"form": form, "announcement": announcement})
+
+
+@capability_required("publish_announcements")
+@require_POST
+def announcement_withdraw_view(request, announcement_id):
+    ctx = RequestContext.from_request(request)
+    announcement = get_in_scope_or_404(request.user, "can_manage_announcement", Announcement.objects.all(), ctx=ctx,
+                                       pk=announcement_id)
+    services.withdraw(request.user, announcement, ctx)
+    messages.success(request, "Announcement withdrawn.")
+    return redirect("notifications:manage")
+
+
+@capability_required("publish_announcements")
+def manage_view(request):
+    qs = Announcement.objects.select_related("author").order_by("-created_at")
+    if request.user.role not in Role.ADMINS:
+        qs = qs.filter(author=request.user)
+    return render(request, "notifications/manage.html", {"page": Paginator(qs, 25).get_page(request.GET.get("page"))})

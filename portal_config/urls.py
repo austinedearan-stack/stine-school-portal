@@ -13,7 +13,7 @@ urlpatterns = [
     path("clubs/", include("apps.clubs.urls")),
     path("requests/", include("apps.student_requests.urls")),
     path("administration/", include("apps.administration.urls")),
-    # Feature modules are mounted as each is rebuilt on the Phase 2 schema (phases 4-11).
+    path("notifications/", include("apps.notifications.urls")),
 ]
 
 # The stock Django admin bypasses MFA, the policy layer and the audit trail (audit finding A-2).

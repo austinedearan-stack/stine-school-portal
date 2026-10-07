@@ -46,8 +46,8 @@ lands (see `ARCHITECTURE.md` §9). ✅ = fixed in Phase 1 with a regression test
 
 | ID | Sev | Finding | Phase |
 |----|-----|---------|-------|
-| Z-1 | H | `announcement_detail_view` returns any published announcement by UUID with no audience check (department/staff-only announcements readable by any user). | 11 |
-| Z-2 | H | Student announcement filter uses `Q(department=…)` without `audience`, so **staff-only** announcements scoped to a department leak to that department's students. | 11 |
+| Z-1 | H | `announcement_detail_view` returns any published announcement by UUID with no audience check (department/staff-only announcements readable by any user). | ✅ 11 |
+| Z-2 | H | Student announcement filter uses `Q(department=…)` without `audience`, so **staff-only** announcements scoped to a department leak to that department's students. | ✅ 11 |
 | Z-3 | H | `can_view_student` lets *every* staff member view *every* student, including phone and emergency contacts (violates least privilege / spec §26). | ✅ 4 |
 | Z-4 | H | Admin request panel: new status is taken verbatim from POST (`ticket.status = new_status`) — no allowlist, no state machine; `assigned_to` accepts any staff id. | ✅ 9 |
 | Z-5 | H | Approved transfers can be "executed" repeatedly, outside a transaction, regardless of transfer type. | ✅ 9 (separate, once-only, separation-of-duties execution) |
@@ -55,7 +55,7 @@ lands (see `ARCHITECTURE.md` §9). ✅ = fixed in Phase 1 with a regression test
 | Z-7 | M | Club join auto-approves membership (spec requires approval). | ✅ 8 |
 | Z-8 | M | Request `priority` accepted from student POST without validation (mass assignment / 500 on long values). | ✅ 9 |
 | Z-9 | M | Students can reply to CLOSED/CANCELLED requests; no attachment count limit. | ✅ 9 |
-| Z-10 | L | Notification "mark read" is a state change via GET. | 11 |
+| Z-10 | L | Notification "mark read" is a state change via GET. | ✅ 11 |
 
 ## 4. Input handling / files
 

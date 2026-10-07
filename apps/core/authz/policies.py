@@ -311,3 +311,56 @@ ACCOUNT_ADMIN_CAPABILITIES = ("manage_user_accounts", "manage_roles", "manage_st
 @policy("can_view_accounts")
 def can_view_accounts(actor, obj=None) -> bool:
     return any(has_capability(actor, c) for c in ACCOUNT_ADMIN_CAPABILITIES)
+
+
+# --- Announcements (audit Z-1, Z-2) ------------------------------------------------------------------
+
+
+@policy("can_view_announcement")
+def can_view_announcement(actor, announcement) -> bool:
+    from apps.notifications.selectors import can_see
+
+    return can_see(actor, announcement)
+
+
+@policy("can_manage_announcement")
+def can_manage_announcement(actor, announcement) -> bool:
+    """Edit/withdraw: the author (while they still hold the capability) or an admin holding it."""
+    if not has_capability(actor, "publish_announcements"):
+        return False
+    return announcement is None or announcement.author_id == actor.pk or actor.role in Role.ADMINS
+
+
+@policy("can_publish_announcement")
+def can_publish_announcement(actor, announcement) -> bool:
+    """Admins: any scope. Staff: own department, own offerings, clubs they advise, or named students who are
+    registered in their own offerings (ARCHITECTURE.md §5.3)."""
+    from apps.academics.models import RegistrationStatus
+    from apps.notifications.models import Scope
+
+    if not has_capability(actor, "publish_announcements"):
+        return False
+    if actor.role in Role.ADMINS or announcement is None:
+        return True
+    staff = getattr(actor, "staff_profile", None)
+    if staff is None:
+        return False
+    scope = announcement.scope
+    if scope == Scope.DEPARTMENT:
+        return announcement.department_id == staff.department_id
+    if scope == Scope.OFFERING:
+        return announcement.offering is not None and announcement.offering.lecturer_id == staff.pk
+    if scope == Scope.CLUB:
+        return announcement.club is not None and announcement.club.advisor_id == staff.pk
+    if scope == Scope.INDIVIDUAL:
+        recipients = getattr(announcement, "_pending_recipients", None)
+        if recipients is None:
+            recipients = list(announcement.recipients.all())
+        if not recipients:
+            return False
+        from apps.academics.models import UnitRegistration
+
+        taught = set(UnitRegistration.objects.filter(
+            offering__lecturer=staff, status=RegistrationStatus.REGISTERED).values_list("student__user_id", flat=True))
+        return all(user.pk in taught for user in recipients)
+    return False  # UNIVERSITY, FACULTY and PROGRAM are admin-only

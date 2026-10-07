@@ -97,6 +97,11 @@
 {% endif %}
 
 <section class="card">
+  <h2>Announcements</h2>
+  {% for a in announcements %}<p><a href="{% url 'notifications:announcement' a.pk %}"><strong>{{ a.title }}</strong></a> <span class="muted small">{{ a.publish_at|date:"j M" }}</span><br><span class="small">{{ a.body|truncatewords:25 }}</span></p>
+  {% empty %}<p class="empty">No announcements.</p>{% endfor %}
+</section>
+<section class="card">
   <h2>Recent notifications</h2>
   {% for n in notifications %}<p>{% if not n.read_at %}<span class="badge badge-info">new</span> {% endif %}<strong>{{ n.title }}</strong> <span class="muted small">{{ n.created_at|timesince }} ago</span><br><span class="small">{{ n.body }}</span></p>
   {% empty %}<p class="empty">No notifications.</p>{% endfor %}

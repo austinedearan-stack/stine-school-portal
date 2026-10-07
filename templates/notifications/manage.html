@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Manage announcements{% endblock %}
+{% block content %}
+<div class="page-header"><div><h1>Manage announcements</h1></div><a class="btn" href="{% url 'notifications:announcement_create' %}">New announcement</a></div>
+<div class="card">
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Title</th><th>Author</th><th>Audience</th><th>Publish</th><th>Status</th><th>Notified</th></tr></thead>
+    <tbody>{% for a in page.object_list %}<tr>
+      <td><a href="{% url 'notifications:announcement' a.pk %}">{{ a.title }}</a></td>
+      <td>{{ a.author.full_name }}</td>
+      <td>{{ a.get_audience_roles_display }} · {{ a.get_scope_display }}</td>
+      <td>{{ a.publish_at|date:"j M Y H:i" }}</td>
+      <td><span class="badge">{{ a.get_status_display }}</span></td>
+      <td>{{ a.notified_at|date:"j M H:i"|default:"–" }}</td>
+    </tr>{% empty %}<tr><td colspan="6" class="empty">No announcements.</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% include "partials/pagination.html" %}
+</div>
+{% endblock %}

@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}{% if announcement %}Edit announcement{% else %}New announcement{% endif %}{% endblock %}
+{% block content %}
+<div class="page-header"><div><h1>{% if announcement %}Edit announcement{% else %}New announcement{% endif %}</h1>
+  <p>Pick who should see it: a role audience plus a scope. Only the matching people are notified.</p></div></div>
+<div class="card"><form method="post" enctype="multipart/form-data" class="form" novalidate>
+  {% csrf_token %}
+  {% include "partials/form.html" %}
+  <div class="row">
+    <button class="btn" type="submit" name="action" value="publish">Publish</button>
+    <button class="btn btn-secondary" type="submit" name="action" value="draft">Save draft</button>
+    <a class="btn btn-secondary" href="{% url 'notifications:manage' %}">Cancel</a>
+  </div>
+</form></div>
+{% endblock %}

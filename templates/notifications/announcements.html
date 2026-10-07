@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Announcements{% endblock %}
+{% block content %}
+<div class="page-header"><div><h1>Announcements</h1><p>Announcements addressed to you.</p></div>
+  {% if can_publish %}<a class="btn" href="{% url 'notifications:announcement_create' %}">New announcement</a>{% endif %}</div>
+{% for a in page.object_list %}
+  <section class="card">
+    <h2><a href="{% url 'notifications:announcement' a.pk %}">{{ a.title }}</a></h2>
+    <p class="small muted">{{ a.publish_at|date:"j M Y H:i" }} · {{ a.author.full_name }} · {{ a.get_scope_display }}{% if a.status != "PUBLISHED" %} · <span class="badge">{{ a.get_status_display }}</span>{% endif %}</p>
+    <p class="prewrap">{{ a.body|truncatewords:60 }}</p>
+  </section>
+{% empty %}
+  <div class="card"><p class="empty">No announcements for you right now.</p></div>
+{% endfor %}
+{% include "partials/pagination.html" %}
+{% endblock %}

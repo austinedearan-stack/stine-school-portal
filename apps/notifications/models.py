@@ -93,6 +93,8 @@ class Announcement(TimeStampedModel):
     publish_at = models.DateTimeField()
     expires_at = models.DateTimeField(null=True, blank=True)
     status = models.CharField(max_length=10, choices=AnnouncementStatus.choices, default=AnnouncementStatus.DRAFT)
+    # Set once the audience has been notified (at publish time, or by the scheduled job for future-dated items).
+    notified_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["-publish_at"]
@@ -128,3 +130,23 @@ class AnnouncementAttachment(models.Model):
 
     def __str__(self):
         return f"Attachment {self.file_id} on {self.announcement_id}"
+
+
+class OutboundEmail(models.Model):
+    """Optional email copy of a notification, sent by ``manage.py send_outbox`` (never in the request)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
+    subject = models.CharField(max_length=200)
+    body = models.TextField(max_length=2000)
+    created_at = models.DateTimeField(auto_now_add=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    last_error = models.CharField(max_length=200, blank=True)
+
+    class Meta:
+        ordering = ["created_at"]
+        indexes = [models.Index(fields=["sent_at", "attempts"])]
+
+    def __str__(self):
+        return f"{self.recipient_id}: {self.subject}"

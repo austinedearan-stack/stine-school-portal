@@ -29,6 +29,7 @@ def dashboard_context(user) -> dict:
         "semester": semester,
         "today": timezone.localdate(),
         "notifications": notifications.notifications_for(user)[:5],
+        "announcements": notifications.visible_announcements(user)[:3],
     }
     if user.role == Role.STUDENT:
         student = getattr(user, "student_profile", None)

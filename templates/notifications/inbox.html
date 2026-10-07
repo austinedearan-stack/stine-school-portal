@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Notifications{% endblock %}
+{% block content %}
+<div class="page-header"><div><h1>Notifications</h1></div>
+  <form method="post" action="{% url 'notifications:read_all' %}">{% csrf_token %}<button class="btn btn-secondary" type="submit">Mark all as read</button></form></div>
+<div class="card">
+  {% for n, link in items %}
+    <div class="tt-slot">
+      {% if not n.read_at %}<span class="badge badge-info">new</span> {% endif %}<strong>{{ n.title }}</strong> <span class="small muted">{{ n.get_kind_display }} · {{ n.created_at|date:"j M Y H:i" }}</span>
+      {% if n.body %}<div class="small prewrap">{{ n.body }}</div>{% endif %}
+      {% if link or not n.read_at %}
+      <form method="post" action="{% url 'notifications:open' n.pk %}" class="inline">{% csrf_token %}<button class="link-button small" type="submit">{% if link %}Open{% else %}Mark as read{% endif %}</button></form>
+      {% endif %}
+    </div>
+  {% empty %}<p class="empty">You have no notifications.</p>{% endfor %}
+  {% include "partials/pagination.html" %}
+</div>
+{% endblock %}

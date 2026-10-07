@@ -229,6 +229,8 @@ REST_FRAMEWORK = {
 }
 
 # --- Email ----------------------------------------------------------------------------------------
+# Notification kinds that also get an email copy via the outbox (empty = in-app only).
+NOTIFICATION_EMAIL_KINDS = env_list("NOTIFICATION_EMAIL_KINDS")
 DEFAULT_FROM_EMAIL = env_str("DEFAULT_FROM_EMAIL", "no-reply@example.test")
 EMAIL_SUBJECT_PREFIX = "[Student Portal] "
 

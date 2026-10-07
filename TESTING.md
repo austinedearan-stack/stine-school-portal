@@ -116,6 +116,13 @@ Markers: `postgres` (requires PostgreSQL — skipped on SQLite), `slow`.
 * Bug found by the tests: forms used `instance.pk` to detect new objects, but UUID primary keys exist before saving;
   fixed with `_state.adding` (and checked that no other code relies on `pk` for this).
 
+## Phase 11 results (2026-10-08)
+
+* `tests/notifications/test_notifications.py` (14): department/staff leak (Z-2), detail-page audience check (Z-1),
+  offering/club/individual scopes, drafts/future/expired hidden, exactly-once audience delivery, scheduled delivery,
+  staff publishing limits (department, offerings, individual recipients), withdrawal rights, POST-only read state and
+  cross-user isolation (Z-10), link allowlist, opt-in email outbox.
+
 ## Required categories (spec §35) — coverage plan
 
 | Category | Phase(s) |
