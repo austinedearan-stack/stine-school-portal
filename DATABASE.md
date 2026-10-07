@@ -9,6 +9,8 @@ Implementation notes (deliberate, minor deviations from the design text below):
   U(application, rank) and U(application, hostel).
 * `UnitRegistration.registered_by` (nullable) records the admin who used a registration override.
 * `HostelAllocation.ended_at` records when an allocation stopped holding its bed.
+* `accounts.UserSession(session_key PK, user, created_at)` indexes each user's live session keys so all of a
+  user's sessions can be ended at once (deactivation, MFA reset, password change) without scanning the session table.
 * `seq` on append-only tables: PostgreSQL assigns it in a `BEFORE INSERT` trigger from a per-table sequence;
   other engines (development/test only) assign max+1 in the ORM.
 * Append-only triggers allow mutation only in a deliberate maintenance session that sets

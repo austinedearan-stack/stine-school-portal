@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Temporarily unavailable{% endblock %}
+{% block content %}
+<div class="auth-wrap"><div class="auth-card card">
+  <h1>Temporarily unavailable</h1>
+  <p>{{ message|default:"This action is temporarily unavailable. Please try again in a few minutes." }}</p>
+  <a class="btn" href="{% url 'accounts:login' %}">Back to sign in</a>
+</div></div>
+{% endblock %}

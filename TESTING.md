@@ -50,6 +50,14 @@ Markers: `postgres` (requires PostgreSQL — skipped on SQLite), `slow`.
   PostgreSQL), redaction of secret-like keys in `changes`, keyed hashing of attempted identifiers.
 * `ruff check .` clean; `bandit -ll` clean; `makemigrations --check` clean.
 
+## Phase 3 results (2026-10-07)
+
+* 169 passed, 2 skipped (PostgreSQL-only) on SQLite. New suites in `tests/auth/`: login, throttling, MFA,
+  session policy + password change/reset, authorization and account-admin invariants, management commands;
+  `tests/security/test_mfa_enrollment_bypass.py` updated to the final flow.
+* `tests/helpers.py`: `login()` builds a session that passes the session policy (auth time, activity, MFA stamp);
+  `enrol()` gives a user a confirmed authenticator; `totp_code()` generates codes for a given time-step.
+
 ## Required categories (spec §35) — coverage plan
 
 | Category | Phase(s) |

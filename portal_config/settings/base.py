@@ -14,6 +14,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 # --- Core -----------------------------------------------------------------------------------------
 # Validated (presence, length) by development.py / production.py; testing.py generates a random key.
 SECRET_KEY = env_str("DJANGO_SECRET_KEY")
+# Previous keys accepted for verification only, so sessions survive a key rotation (DEPLOYMENT.md).
+SECRET_KEY_FALLBACKS = env_list("DJANGO_SECRET_KEY_FALLBACKS")
 DEBUG = False
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS")
 
@@ -48,16 +50,16 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "apps.core.middleware.RequestContextMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    "apps.core.middleware.SessionPolicyMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "apps.core.middleware.SecurityHeadersMiddleware",
-    "apps.core.middleware.RateLimitMiddleware",
-    "apps.core.middleware.AuditLoggingMiddleware",
 ]
 
 ROOT_URLCONF = "portal_config.urls"
@@ -140,7 +142,6 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "apps.accounts.validators.MaximumLengthValidator", "OPTIONS": {"max_length": 128}},
     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
-    {"NAME": "apps.accounts.validators.ComplexPasswordValidator"},
 ]
 
 # Keys for encrypting MFA secrets at rest (comma separated Fernet keys; first encrypts, all decrypt)
@@ -153,9 +154,16 @@ MFA_ISSUER_NAME = env_str("MFA_ISSUER_NAME", "University Student Portal")
 SESSION_ENGINE = "django.contrib.sessions.backends.db"
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
-SESSION_COOKIE_AGE = 30 * 60  # idle timeout (refreshed per request); admin policy tightened in Phase 3
 SESSION_SAVE_EVERY_REQUEST = True
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+# Idle and absolute lifetimes are enforced by SessionPolicyMiddleware (ARCHITECTURE.md §4.3);
+# the cookie age is the longest absolute lifetime.
+SESSION_IDLE_TIMEOUT = env_int("SESSION_IDLE_TIMEOUT", 30 * 60, minimum=60)
+SESSION_IDLE_TIMEOUT_ADMIN = env_int("SESSION_IDLE_TIMEOUT_ADMIN", 15 * 60, minimum=60)
+SESSION_ABSOLUTE_TIMEOUT = env_int("SESSION_ABSOLUTE_TIMEOUT", 12 * 60 * 60, minimum=300)
+SESSION_ABSOLUTE_TIMEOUT_ADMIN = env_int("SESSION_ABSOLUTE_TIMEOUT_ADMIN", 4 * 60 * 60, minimum=300)
+SESSION_COOKIE_AGE = SESSION_ABSOLUTE_TIMEOUT
+DEVICE_COOKIE_NAME = "portal_device"
 
 CSRF_COOKIE_HTTPONLY = True  # templates/HTMX read the token from the page, never from document.cookie
 CSRF_COOKIE_SAMESITE = "Lax"

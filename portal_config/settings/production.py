@@ -87,6 +87,7 @@ SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_NAME = "__Host-portal_session"
 CSRF_COOKIE_NAME = "__Host-portal_csrf"
+DEVICE_COOKIE_NAME = "__Host-portal_device"
 
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},

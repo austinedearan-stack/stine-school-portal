@@ -10,12 +10,26 @@ the project brief, with the server — not the browser — enforcing every secur
 |---|---|---|
 | 1 | Architecture, requirements, foundation hardening | **Done** — see below |
 | 2 | Models & migrations (schema of `DATABASE.md`) | **Done** — see below |
-| 3 | Authentication & authorization | Not started (inherited login exists but is **not** trusted — see `docs/AUDIT_EXISTING_CODE.md`) |
+| 3 | Authentication & authorization | **Done** — see below |
 | 4–11 | Feature modules | Not started (inherited views exist; many render missing templates) |
 | 12–15 | Hardening, testing, adversarial testing, deployment | Not started |
 
 **This is not yet a usable portal.** The inherited code was audited and several critical issues
 were found; until each feature phase is complete and tested, treat every feature as unfinished.
+
+Phase 3 delivered:
+
+* Login by student/staff ID or email with uniform failure responses; HMAC-subject throttling with
+  per-pair back-off, per-subject slow-down and a device-cookie bucket (attackers cannot lock owners out);
+  the limiter fails closed (503).
+* TOTP MFA for every admin, superadmin and capability holder; first enrollment requires a one-time code
+  delivered out of band; recovery codes; re-authentication before security changes; optional MFA for others.
+* Password change, and reset by emailed one-time code (no tokens in URLs); every password change ends other
+  sessions, revokes trusted devices and outstanding codes, and notifies the user.
+* Session policy middleware: idle/absolute lifetimes (shorter for admins), MFA gate, forced password change.
+* `authorize()` with named policies, view decorators and DRF permissions; denials are recorded.
+  Account-administration services enforce the role-ceiling and last-superadmin invariants.
+* Commands: `create_portal_superadmin`, `issue_mfa_enrollment_code`, `rotate_mfa_encryption`, `sync_capabilities`.
 
 Phase 2 delivered:
 
@@ -66,7 +80,8 @@ and `portal_app` (runtime) database roles, runs migrations as the owner, and ser
 SQLite), then `python manage.py migrate && python manage.py runserver`.
 
 Demo data: `python manage.py seed_demo_data` (DEBUG only) creates fake accounts and prints their random
-passwords once. The `create_portal_superadmin` command arrives in Phase 3.
+passwords once. Privileged demo accounts also get a one-time MFA enrollment code. For real deployments create the
+first superadmin with `python manage.py create_portal_superadmin --username ... --email ...`.
 
 ## Common commands
 

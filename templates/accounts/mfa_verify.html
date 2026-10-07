@@ -1,39 +1,14 @@
-{% extends 'base.html' %}
-{% block title %}Multi-Factor Authentication Required{% endblock %}
+{% extends "base.html" %}
+{% block title %}Two-step verification{% endblock %}
 {% block content %}
-<div class="min-h-[70vh] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-    <div class="sm:mx-auto sm:w-full sm:max-w-md">
-        <div class="flex justify-center">
-            <div class="w-14 h-14 bg-indigo-800 rounded-2xl flex items-center justify-center shadow-lg text-white">
-                <svg class="w-8 h-8 text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-                </svg>
-            </div>
-        </div>
-        <h2 class="mt-4 text-center text-2xl font-bold text-slate-900">Two-Factor Authentication</h2>
-        <p class="mt-2 text-center text-sm text-slate-600">Enter the 6-digit verification code from your authenticator app (Google Authenticator, Microsoft Authenticator) or a backup code.</p>
-    </div>
-
-    <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div class="bg-white py-8 px-4 shadow-xl sm:rounded-xl sm:px-10 border border-slate-100">
-            <form method="POST" action="{% url 'accounts:mfa_verify' %}" class="space-y-6">
-                {% csrf_token %}
-                <div>
-                    <label for="id_code" class="block text-sm font-medium text-slate-700 text-center mb-2">Verification Code</label>
-                    {{ form.code }}
-                </div>
-
-                <div>
-                    <button type="submit" class="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 cursor-pointer">
-                        Verify Code & Sign In
-                    </button>
-                </div>
-            </form>
-
-            <div class="mt-6 border-t border-slate-200 pt-4 text-center">
-                <a href="{% url 'accounts:login' %}" class="text-xs text-indigo-600 hover:underline">Cancel and return to login</a>
-            </div>
-        </div>
-    </div>
-</div>
+<div class="auth-wrap"><div class="auth-card card">
+  <h1>Two-step verification</h1>
+  <p class="muted">Enter the 6-digit code from your authenticator app. If you have lost your device, use one of your recovery codes.</p>
+  <form method="post" class="form" novalidate>
+    {% csrf_token %}
+    {% include "partials/form.html" %}
+    <button type="submit" class="btn">Verify</button>
+  </form>
+  <p class="small">Lost your device and your recovery codes? Contact IT support. They will verify your identity before resetting your authenticator.</p>
+</div></div>
 {% endblock %}

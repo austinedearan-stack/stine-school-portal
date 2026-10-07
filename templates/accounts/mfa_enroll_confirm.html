@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Scan the code{% endblock %}
+{% block content %}
+<div class="auth-wrap"><div class="auth-card card">
+  <h1>Scan this code</h1>
+  <ol class="small">
+    <li>Open an authenticator app (for example Google Authenticator, Microsoft Authenticator or Aegis).</li>
+    <li>Scan the QR code, or type the key shown below it.</li>
+    <li>Enter the 6-digit code the app shows.</li>
+  </ol>
+  <img class="qr" src="{{ qr }}" alt="QR code for your authenticator app" width="220" height="220">
+  <p class="small">Key: <code class="mono">{{ secret }}</code></p>
+  <form method="post" class="form" novalidate>
+    {% csrf_token %}
+    {% include "partials/form.html" %}
+    <button type="submit" class="btn">Confirm</button>
+    {% if logged_in %}<a class="btn btn-secondary" href="{% url 'accounts:security' %}">Cancel</a>{% endif %}
+  </form>
+</div></div>
+{% endblock %}

@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Confirm your identity{% endblock %}
+{% block content %}
+<div class="auth-card card">
+  <h1>Confirm your identity</h1>
+  <p class="muted">For your security, confirm your identity before changing security settings.</p>
+  <form method="post" class="form" novalidate>
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ next }}">
+    {% include "partials/form.html" %}
+    <button type="submit" class="btn">Continue</button>
+    <a class="btn btn-secondary" href="{% url 'accounts:security' %}">Cancel</a>
+  </form>
+</div>
+{% endblock %}

@@ -32,5 +32,6 @@ PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]  # test-onl
 
 CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "portal-test"}}
 EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
+EMAIL_SEND_SYNC = True  # tests inspect mail.outbox synchronously
 MEDIA_ROOT = BASE_DIR / "var" / "test-private-media"  # noqa: F405
 DJANGO_ADMIN_ENABLED = False

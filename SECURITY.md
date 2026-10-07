@@ -22,12 +22,12 @@ Design: `ARCHITECTURE.md` §4 (authentication), §5 (authorization), §6 (threat
 | Files | Uploaded files never served from a public URL | ✅ 1 (authorized downloads 9) |
 | Errors | Custom 404/500 without technical detail; 500 page renders with no DB/context dependencies; CSRF failure page generic | ✅ 1 (400/401/403/429 reviewed in 12) |
 | Logging | JSON logs, redaction of password/token/cookie/session/OTP keys and inline `key=value` secrets | ✅ 1 |
-| MFA | Pre-auth session can no longer enroll a new device on an enrolled account (A-1) | 🟡 1 → full design in 3 |
+| MFA | TOTP for every admin/superadmin and capability holder; first enrollment only with an out-of-band one-time enrollment code (A-1); encrypted secrets (A-9); step-counter replay guard (A-7); HMAC single-use recovery codes; per-session and per-user attempt limits (A-8); replacement only after password + factor re-authentication, old device kept until the new one is confirmed | ✅ 3 |
 | Database | Separate owner/runtime roles; runtime role cannot run DDL; statement & idle-transaction timeouts | ✅ 1 (verified manually on PG16; audit-table privilege revocation in 2) |
 | Supply chain | Pinned dependencies, `pip-audit` (0 known vulns at Phase 1), no CDN at runtime (12) | ✅ 1 / ⏳ 12 |
-| AuthN | Argon2id, throttling with device cookies, generic errors, reset by emailed code, session rotation/timeouts | ⏳ 3 |
-| AuthZ | Capability catalog with role ceilings, object policies, scoped selectors, 404 for out-of-scope | ⏳ 3 |
-| Audit | Append-only (ORM + trigger + privileges), sealed hash chain | ⏳ 2 |
+| AuthN | Argon2id; HMAC-subject throttling (IP / subject+IP back-off / per-subject slow-down / device-cookie bucket), fail-closed limiter (A-5, A-6); identical responses for unknown, wrong-password and inactive accounts; reset by emailed one-time code in a POST form (A-4); session key rotation at login and MFA; idle 30/15 min and absolute 12/4 h lifetimes (A-11); POST-only logout (A-10); MFA gate middleware; forced password change; password change ends other sessions, revokes trusted devices and reset codes, notifies the user | ✅ 3 |
+| AuthZ | Capability catalog with role ceilings; `authorize()` + named policies + decorators; denials recorded on an independent connection; role/group/activation invariants (no self-change, grants stripped on role change, ceiling enforced at grant time, last capable superadmin protected under row locks) | ✅ 3 (object policies and scoped selectors per feature phase) |
+| Audit | Append-only (ORM + trigger + privileges), server-assigned sequence | ✅ 2 (sealed hash chain: 12) |
 | Races | Row locks + partial unique / exclusion constraints, PostgreSQL concurrency tests | ⏳ 5, 7 |
 | Uploads | Size/extension/signature checks, image re-encoding, PDF active-content rejection, private storage | ⏳ 9 |
 
@@ -39,7 +39,9 @@ Never include real student data in a report.
 ## Secret rotation (summary — full runbook in DEPLOYMENT.md)
 
 * `DJANGO_SECRET_KEY`: rotate by setting the new key and moving the old one to
-  `DJANGO_SECRET_KEY_FALLBACKS` (Phase 3 wires this) so sessions survive one cycle; remove the fallback later.
+  `DJANGO_SECRET_KEY_FALLBACKS` so sessions survive one cycle; remove the fallback later.
 * Database passwords: `ALTER ROLE … PASSWORD …` then update the secret store and restart.
-* `MFA_ENCRYPTION_KEYS` (Phase 3): prepend the new key; run the re-encryption command; drop the old key.
+* `MFA_ENCRYPTION_KEYS`: prepend the new key; run `manage.py rotate_mfa_encryption`; drop the old key.
+* `PORTAL_HMAC_KEY`: rotating it invalidates outstanding one-time codes and device cookies (users re-verify);
+  existing recovery codes must be re-issued.
 * After any suspected leak: rotate, invalidate all sessions (`clearsessions` + truncate session table), review audit/security logs.

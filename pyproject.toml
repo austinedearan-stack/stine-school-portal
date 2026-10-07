@@ -15,7 +15,7 @@ select = ["E", "F", "W", "I", "B", "S", "DJ", "UP"]
 ignore = ["E501"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101", "S105", "S106", "S108", "S603", "S607", "S608"]  # S608: tests run raw SQL on purpose
+"tests/**" = ["S101", "S105", "S106", "S107", "S108", "S603", "S607", "S608"]  # S608: tests run raw SQL on purpose
 "**/tests/**" = ["S101", "S105", "S106", "S603", "S607"]
 "scripts/**" = ["S603", "S607"]
 

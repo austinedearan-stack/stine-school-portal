@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Set up two-step verification{% endblock %}
+{% block content %}
+<div class="auth-wrap"><div class="auth-card card">
+  <h1>Set up two-step verification</h1>
+  <p class="muted">Your account must use an authenticator app. To start, enter the one-time enrollment code you were given in person by IT support or the registrar.</p>
+  <form method="post" class="form" novalidate>
+    {% csrf_token %}
+    {% include "partials/form.html" %}
+    <button type="submit" class="btn">Continue</button>
+  </form>
+</div></div>
+{% endblock %}

@@ -8,7 +8,6 @@
 
 from __future__ import annotations
 
-import secrets
 from datetime import date, time, timedelta
 
 from django.conf import settings
@@ -29,7 +28,9 @@ from apps.academics.models import (
     UnitOffering,
     UnitPrerequisite,
 )
+from apps.accounts import mfa
 from apps.accounts.models import StaffProfile, StudentProfile, User
+from apps.accounts.passwords import generate_initial_password
 from apps.clubs.models import Club, ClubKind
 from apps.core.capabilities import Role
 from apps.hostels.models import (
@@ -63,24 +64,26 @@ class Command(BaseCommand):
             raise CommandError("Refusing to seed demo data with DEBUG off (pass --allow-non-debug on a disposable copy).")
         if Faculty.objects.exists():
             raise CommandError("Data already exists; demo seed only runs on an empty database.")
-        credentials: list[tuple[str, str, str]] = []
+        credentials: list[tuple[str, str, str, str]] = []
         with transaction.atomic():
             self._seed(options["students"], credentials)
         self.stdout.write(self.style.SUCCESS("Demo data created. Credentials (shown once, not stored):"))
-        for username, role, password in credentials:
-            self.stdout.write(f"  {role:<11} {username:<14} {password}")
-        self.stdout.write("Privileged accounts must enrol an authenticator app at first login.")
+        for username, role, password, enrollment in credentials:
+            extra = f"   enrollment code: {enrollment}" if enrollment else ""
+            self.stdout.write(f"  {role:<11} {username:<14} {password}{extra}")
+        self.stdout.write("Accounts with an enrollment code must set up an authenticator app at first login.")
 
     # ------------------------------------------------------------------------------------------
     def _user(self, credentials, username, role, first, last, groups=()):
-        password = secrets.token_urlsafe(12)
+        password = generate_initial_password(16)
         user = User.objects.create_user(
             username=username, email=f"{username.lower()}@example.test", password=password, role=role,
             first_name=first, last_name=last,
         )
         for name in groups:
             user.groups.add(Group.objects.get(name=name))
-        credentials.append((username, role, password))
+        enrollment = mfa.issue_enrollment_code(user, issued_by=None) if mfa.is_mfa_required(user) else ""
+        credentials.append((username, role, password, enrollment))
         return user
 
     def _seed(self, student_count: int, credentials):

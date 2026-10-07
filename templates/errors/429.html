@@ -1,12 +1,9 @@
-{% extends 'base.html' %}
-{% block title %}429 - Rate Limit Exceeded{% endblock %}
+{% extends "base.html" %}
+{% block title %}Too many requests{% endblock %}
 {% block content %}
-<div class="min-h-[60vh] flex flex-col items-center justify-center text-center px-4">
-    <div class="bg-amber-100 text-amber-800 p-4 rounded-full mb-4">
-        <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-    </div>
-    <h1 class="text-3xl font-extrabold text-slate-900 tracking-tight sm:text-4xl mb-2">429 - Too Many Requests</h1>
-    <p class="text-base text-slate-600 max-w-md mb-6">{{ message|default:"You have submitted too many requests in a short period. Please wait a moment before trying again." }}</p>
-    <a href="{% url 'accounts:login' %}" class="inline-flex items-center px-4 py-2 rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">Return to Login</a>
-</div>
+<div class="auth-wrap"><div class="auth-card card">
+  <h1>Too many requests</h1>
+  <p>{{ message|default:"Please wait a moment and try again." }}</p>
+  <a class="btn" href="{% url 'accounts:login' %}">Back to sign in</a>
+</div></div>
 {% endblock %}

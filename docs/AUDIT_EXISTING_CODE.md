@@ -22,25 +22,25 @@ lands (see `ARCHITECTURE.md` §9). ✅ = fixed in Phase 1 with a regression test
 | S-4 | `apps/requests` is placed on `sys.path` via `sys.path.insert(0, BASE_DIR/'apps')`, so `import requests` anywhere in the process resolves to the portal app instead of the PyPI `requests` library (breaks third-party code; confusing import semantics). | ✅ 1 (app renamed `student_requests`, hack removed) |
 | S-5 | Pinned to `Django>=5.0,<5.2`; Django 5.0 and 5.1 are end-of-life. `gunicorn` is used by the Dockerfile but is not in `requirements.txt`. Dependencies unpinned. | ✅ 1 (Django 5.2 LTS, pinned) |
 | S-6 | Many views swallow every exception (`except Exception: pass`), hiding real defects. | 4–11 |
-| S-7 | Role checks are string comparisons scattered across views (`request.user.role != 'STUDENT'`) rather than the central policy layer the spec requires. | 3 |
-| S-8 | **Admins can never finish logging in.** `mfa_verify_view` returns the tuple from `complete_user_login()` instead of an HTTP response, so the correct TOTP code crashes the request (`TypeError`) after the session is already logged in (found by runtime probe). | 3 |
-| S-9 | First-time MFA enrollment calls `verify_totp()` on an unsaved throw-away `User`, which **inserts a blank, active STUDENT account** (username `''`) on every enrollment; the second admin to enroll then hits a unique-constraint error (found by runtime probe). | 3 |
+| S-7 | Role checks are string comparisons scattered across views (`request.user.role != 'STUDENT'`) rather than the central policy layer the spec requires. | ✅ 3 |
+| S-8 | **Admins can never finish logging in.** `mfa_verify_view` returns the tuple from `complete_user_login()` instead of an HTTP response, so the correct TOTP code crashes the request (`TypeError`) after the session is already logged in (found by runtime probe). | ✅ 3 |
+| S-9 | First-time MFA enrollment calls `verify_totp()` on an unsaved throw-away `User`, which **inserts a blank, active STUDENT account** (username `''`) on every enrollment; the second admin to enroll then hits a unique-constraint error (found by runtime probe). | ✅ 3 |
 
 ## 2. Authentication
 
 | ID | Sev | Finding | Phase |
 |----|-----|---------|-------|
-| A-1 | **C** | **MFA bypass.** After a correct password, an MFA-enrolled admin is put in a "pre-MFA" session and redirected to `/accounts/mfa/verify/`. The attacker can instead browse to `/accounts/mfa/setup/`, which accepts the same pre-MFA session, enrolls a **new** TOTP secret and completes login — bypassing the victim's second factor with only the password. | 🟡 1 — bypass for *enrolled* accounts closed + 4 regression tests; first-time enrollment still password-only until one-time enrollment codes (Phase 3) |
+| A-1 | **C** | **MFA bypass.** After a correct password, an MFA-enrolled admin is put in a "pre-MFA" session and redirected to `/accounts/mfa/verify/`. The attacker can instead browse to `/accounts/mfa/setup/`, which accepts the same pre-MFA session, enrolls a **new** TOTP secret and completes login — bypassing the victim's second factor with only the password. | ✅ 3 (Phase 1 containment + one-time enrollment codes) |
 | A-2 | **C** | **Django admin bypasses MFA.** `/django-admin/` uses Django's stock login (password only). Any `is_staff` account reaches it without MFA. | ✅ 1 (admin site disabled unless explicitly enabled; OTP-protected version in 3) |
 | A-3 | H | Hard-coded fallback `SECRET_KEY` in `settings/base.py`; production silently runs with it if the env var is missing. `.env.example` ships `DEBUG=True`. | ✅ 1 |
-| A-4 | H | Password reset is a placeholder — no token is generated or sent. | 3 |
-| A-5 | H | Account lockout is per-account only (5 failures → 15 min). Anyone can lock any account indefinitely by repeating 5 bad guesses every 15 min (spec §22 forbids this). | 3 |
-| A-6 | M | Account enumeration: unknown usernames never return "account locked", existing ones do; unknown usernames also skip password hashing (timing oracle). | 3 |
+| A-4 | H | Password reset is a placeholder — no token is generated or sent. | ✅ 3 |
+| A-5 | H | Account lockout is per-account only (5 failures → 15 min). Anyone can lock any account indefinitely by repeating 5 bad guesses every 15 min (spec §22 forbids this). | ✅ 3 |
+| A-6 | M | Account enumeration: unknown usernames never return "account locked", existing ones do; unknown usernames also skip password hashing (timing oracle). | ✅ 3 |
 | A-7 | M | TOTP replay protection compares only the *last code string*; with `valid_window=1` a different still-valid code from the previous step is accepted after a newer one. Must track the last accepted time-step counter. | ✅ 2 (step counter + conditional update) |
-| A-8 | M | MFA verification is not rate-limited per user/pre-auth session (only a per-IP path rule that is spoofable, see I-1). | 3 |
+| A-8 | M | MFA verification is not rate-limited per user/pre-auth session (only a per-IP path rule that is spoofable, see I-1). | ✅ 3 |
 | A-9 | M | TOTP secrets stored in plaintext. | ✅ 2 (MultiFernet at rest) |
-| A-10 | M | Logout accepts GET (cross-site logout); MFA enrollment allowed without re-authentication from an existing session. | 3 |
-| A-11 | L | Session timeout identical for admins and students; no absolute session lifetime. | 3 |
+| A-10 | M | Logout accepts GET (cross-site logout); MFA enrollment allowed without re-authentication from an existing session. | ✅ 3 |
+| A-11 | L | Session timeout identical for admins and students; no absolute session lifetime. | ✅ 3 |
 
 ## 3. Authorization / IDOR
 
@@ -51,7 +51,7 @@ lands (see `ARCHITECTURE.md` §9). ✅ = fixed in Phase 1 with a regression test
 | Z-3 | H | `can_view_student` lets *every* staff member view *every* student, including phone and emergency contacts (violates least privilege / spec §26). | 3 |
 | Z-4 | H | Admin request panel: new status is taken verbatim from POST (`ticket.status = new_status`) — no allowlist, no state machine; `assigned_to` accepts any staff id. | 9–10 |
 | Z-5 | H | Approved transfers can be "executed" repeatedly, outside a transaction, regardless of transfer type. | 9 |
-| Z-6 | M | All ADMINs have all admin powers (`role_required(ADMIN, SUPERADMIN)`), no granular permissions (spec §34). | 3 |
+| Z-6 | M | All ADMINs have all admin powers (`role_required(ADMIN, SUPERADMIN)`), no granular permissions (spec §34). | ✅ 3 |
 | Z-7 | M | Club join auto-approves membership (spec requires approval). | 8 |
 | Z-8 | M | Request `priority` accepted from student POST without validation (mass assignment / 500 on long values). | 9 |
 | Z-9 | M | Students can reply to CLOSED/CANCELLED requests; no attachment count limit. | 9 |

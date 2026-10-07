@@ -23,9 +23,26 @@ Environment for Phase 1 results: Python 3.13.16, Django 5.2.18, PostgreSQL 16.15
 | P1-13 | Database privilege (I-2) | As `portal_app`: `CREATE TABLE`; check `rolsuper` | Denied; not superuser | App ran as PostgreSQL superuser | `deploy/postgres/init/01-roles.sh` | Manual verification on PG16 (2026-10-07): `permission denied for schema public`, `rolsuper=f`. Automated in Phase 2 |
 | P1-14 | Module shadowing (S-4) | `import requests` resolved to the portal app | Library import unaffected | Shadowed | App renamed `student_requests`, `sys.path` hack removed | `test_apps_directory_not_injected_into_sys_path` |
 
+## Phase 2–3 results
+
+Environment: Python 3.14.5, Django 5.2.18, SQLite (PostgreSQL-only tests run in CI), 2026-10-07.
+
+| # | Vulnerability tested | Attack method | Expected | Actual (before fix) | Fix | Regression test |
+|---|---|---|---|---|---|---|
+| P2-01 | Audit tampering (I-5) | `QuerySet.update/delete`, `bulk_update`, raw `UPDATE`/`DELETE`/`TRUNCATE` on audit tables | Refused at ORM and DB | Only `Model.save/delete` guarded | ORM guard + triggers + privilege revocation | `tests/models/test_append_only.py` |
+| P2-02 | Superuser escalation (D4) | `User.objects.update(is_superuser=True)`; `createsuperuser` | Refused | Allowed | DB CHECK; `create_superuser` disabled | `tests/models/test_constraints.py` |
+| P3-01 | First-time MFA enrollment with password only (A-1 remainder) | Correct password for an un-enrolled admin, then the enrollment page | QR/secret never shown without a valid out-of-band enrollment code | Password alone enrolled a device | One-time HMAC-stored enrollment codes | `test_first_enrollment_requires_an_out_of_band_code` |
+| P3-02 | TOTP replay (A-7) | Re-submit an accepted code; submit an older-step code after a newer one | Refused | Older-step code accepted | Step counter + conditional UPDATE | `test_totp_code_cannot_be_replayed`, `test_older_step_code_is_refused_after_a_newer_one` |
+| P3-03 | Brute force / lockout DoS (A-5) | 5 wrong passwords then the right one; 40 failures from many IPs; owner with device cookie | Pair locked with back-off; owner on a known device unaffected | Any account lockable by anyone | HMAC-subject throttle with device-cookie bucket | `tests/auth/test_throttle.py` (9) |
+| P3-04 | Account enumeration (A-6) | Compare responses for unknown / wrong password / inactive; reset request for unknown account | Identical | Different messages; no hashing for unknown users | Uniform responses, dummy hash, async mail | `test_failure_responses_are_identical_for_every_cause`, `test_reset_request_response_is_identical_for_unknown_accounts` |
+| P3-05 | Limiter outage | Cache raises on every call during login | 503, not logged in | — | Fail-closed limiter | `test_limiter_failure_fails_closed` |
+| P3-06 | Open redirect (T17) | `next` pointing off-site (absolute URL, protocol-relative, backslash, `javascript:`) | Redirect to dashboard | — | `safe_next_url` | `test_next_parameter_cannot_redirect_off_site` (4) |
+| P3-07 | Session fixation / hijack (T3, A-11) | Pre-login session id reused; idle/absolute timeout; MFA-required session without MFA stamp | New key at login; sessions end; refused | Same key reused across MFA; single timeout | Rotation + SessionPolicyMiddleware | `test_session_key_rotates_on_login`, timeout tests, `test_mfa_required_session_without_mfa_stamp_is_refused` |
+| P3-08 | Password reset abuse (A-4) | Reuse code; 5 wrong attempts; code after password change; reset to bypass MFA | All refused; MFA still required | Reset not implemented | Emailed HMAC code, 20 min, 5 attempts, single use | `tests/auth/test_sessions_and_passwords.py` |
+| P3-09 | Privilege escalation via role management (T6, Z-6) | Admin in Superadmin group changes roles; self role change; out-of-ceiling group; removing last superadmin; IT support resetting an admin's MFA | All refused | All admins had all powers | Ceilings + `authorize` + invariants under row locks | `tests/auth/test_authz.py` |
+| P3-10 | Cross-site logout (A-10) | `GET /accounts/logout/` | 405 | Logged out | POST-only logout | `test_logout_requires_post_and_flushes_session` |
+
 ## Known open issues (not yet fixed)
 
-All remaining findings in `docs/AUDIT_EXISTING_CODE.md` are open and scheduled. Notably: first-time MFA
-enrollment still needs only the password (one-time enrollment codes, Phase 3); per-account lockout can be
-abused to lock users out (A-5, Phase 3); password reset is a placeholder (A-4, Phase 3); announcement IDOR
-(Z-1/Z-2, Phase 11); unrestricted request status changes (Z-4, Phase 9–10).
+Remaining findings in `docs/AUDIT_EXISTING_CODE.md` are scheduled to the feature phases that rebuild the
+affected modules (Z-1/Z-2 announcements, Z-4/Z-5 requests and transfers, Z-7 clubs, F-2/F-3 uploads).

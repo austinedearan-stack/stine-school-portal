@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Account security{% endblock %}
+{% block content %}
+<div class="page-header"><div><h1>Account security</h1><p>Password, two-step verification and sessions.</p></div></div>
+<div class="grid grid-2">
+  <section class="card">
+    <h2>Password</h2>
+    <p class="muted">Changing your password signs you out everywhere else.</p>
+    <a class="btn" href="{% url 'accounts:password_change' %}">Change password</a>
+  </section>
+  <section class="card">
+    <h2>Two-step verification</h2>
+    {% if device %}
+      <p><span class="badge badge-ok">On</span> since {{ device.confirmed_at|date:"j M Y" }}. {{ recovery_remaining }} recovery code{{ recovery_remaining|pluralize }} left.</p>
+      <div class="row">
+        <a class="btn btn-secondary" href="{% url 'accounts:mfa_setup' %}?restart=1">Replace authenticator</a>
+        <form method="post" action="{% url 'accounts:recovery_codes' %}" class="inline">{% csrf_token %}<button class="btn btn-secondary" type="submit">New recovery codes</button></form>
+        {% if not mfa_required %}<form method="post" action="{% url 'accounts:mfa_disable' %}" class="inline">{% csrf_token %}<button class="btn btn-danger" type="submit">Turn off</button></form>{% endif %}
+      </div>
+    {% else %}
+      <p><span class="badge badge-warn">Off</span> Add a second step to protect your account.</p>
+      <a class="btn" href="{% url 'accounts:mfa_setup' %}?restart=1">Set up authenticator</a>
+    {% endif %}
+    {% if mfa_required %}<p class="small muted">Required for your account.</p>{% endif %}
+  </section>
+  <section class="card">
+    <h2>Sessions and devices</h2>
+    <p>{{ other_sessions }} other active session{{ other_sessions|pluralize }}; {{ trusted_devices }} remembered device{{ trusted_devices|pluralize }}.</p>
+    <form method="post" action="{% url 'accounts:end_other_sessions' %}">{% csrf_token %}<button class="btn btn-secondary" type="submit">Sign out everywhere else</button></form>
+  </section>
+</div>
+{% endblock %}
