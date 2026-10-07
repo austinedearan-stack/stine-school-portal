@@ -9,13 +9,27 @@ the project brief, with the server — not the browser — enforcing every secur
 | Phase | Scope | Status |
 |---|---|---|
 | 1 | Architecture, requirements, foundation hardening | **Done** — see below |
-| 2 | Models & migrations (schema of `DATABASE.md`) | Not started |
+| 2 | Models & migrations (schema of `DATABASE.md`) | **Done** — see below |
 | 3 | Authentication & authorization | Not started (inherited login exists but is **not** trusted — see `docs/AUDIT_EXISTING_CODE.md`) |
 | 4–11 | Feature modules | Not started (inherited views exist; many render missing templates) |
 | 12–15 | Hardening, testing, adversarial testing, deployment | Not started |
 
 **This is not yet a usable portal.** The inherited code was audited and several critical issues
 were found; until each feature phase is complete and tested, treat every feature as unfinished.
+
+Phase 2 delivered:
+
+* Every model of `DATABASE.md` with fresh initial migrations: check constraints for every status vocabulary and
+  numeric range, partial unique indexes for "one live X" rules, `is_superuser = false` enforced by the database.
+* Append-only audit tables (`AuditLog`, `SecurityEvent`, `AuditSeal`, `RequestStatusChange`): ORM guard, database
+  triggers (SQLite + PostgreSQL), `UPDATE/DELETE/TRUNCATE` revoked from the runtime role, server-assigned `seq`.
+* PostgreSQL exclusion constraints preventing overlapping timetable entries per venue, lecturer and student group.
+* Capability catalog with role ceilings and default groups (data migration + `manage.py sync_capabilities`);
+  `has_capability()` ignores grants outside a role's ceiling. Default request categories seeded.
+* MFA secrets encrypted at rest (MultiFernet), one-time codes stored as HMAC digests, TOTP replay blocked by
+  time-step counter; `manage.py seed_demo_data` (DEBUG only, fake `@example.test` accounts).
+* Interim state: the inherited feature pages (units, timetable, hostels, clubs, requests, notifications, admin)
+  are unmounted until their phase rebuilds them on the new schema; only sign-in, profile and the dashboard are live.
 
 Phase 1 delivered:
 
@@ -51,7 +65,8 @@ and `portal_app` (runtime) database roles, runs migrations as the owner, and ser
 **Without Docker:** set `DB_ENGINE=sqlite` in `.env` for a quick look (concurrency tests are skipped on
 SQLite), then `python manage.py migrate && python manage.py runserver`.
 
-Seed data and the `create_portal_superadmin` command arrive in Phases 2–3; until then no accounts exist.
+Demo data: `python manage.py seed_demo_data` (DEBUG only) creates fake accounts and prints their random
+passwords once. The `create_portal_superadmin` command arrives in Phase 3.
 
 ## Common commands
 

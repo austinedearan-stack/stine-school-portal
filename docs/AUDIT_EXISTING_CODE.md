@@ -16,7 +16,7 @@ lands (see `ARCHITECTURE.md` §9). ✅ = fixed in Phase 1 with a regression test
 
 | ID | Finding | Phase |
 |----|---------|-------|
-| S-1 | No migrations exist for any app. | 2 |
+| S-1 | No migrations exist for any app. | ✅ 2 |
 | S-2 | No automated tests exist (`pytest.ini` only). | every phase |
 | S-3 | ~20 views render templates that do not exist (`requests/*`, `administration/*`, `notifications/*`, `clubs/club_detail.html`, …) → HTTP 500. | 4–11 |
 | S-4 | `apps/requests` is placed on `sys.path` via `sys.path.insert(0, BASE_DIR/'apps')`, so `import requests` anywhere in the process resolves to the portal app instead of the PyPI `requests` library (breaks third-party code; confusing import semantics). | ✅ 1 (app renamed `student_requests`, hack removed) |
@@ -36,9 +36,9 @@ lands (see `ARCHITECTURE.md` §9). ✅ = fixed in Phase 1 with a regression test
 | A-4 | H | Password reset is a placeholder — no token is generated or sent. | 3 |
 | A-5 | H | Account lockout is per-account only (5 failures → 15 min). Anyone can lock any account indefinitely by repeating 5 bad guesses every 15 min (spec §22 forbids this). | 3 |
 | A-6 | M | Account enumeration: unknown usernames never return "account locked", existing ones do; unknown usernames also skip password hashing (timing oracle). | 3 |
-| A-7 | M | TOTP replay protection compares only the *last code string*; with `valid_window=1` a different still-valid code from the previous step is accepted after a newer one. Must track the last accepted time-step counter. | 3 |
+| A-7 | M | TOTP replay protection compares only the *last code string*; with `valid_window=1` a different still-valid code from the previous step is accepted after a newer one. Must track the last accepted time-step counter. | ✅ 2 (step counter + conditional update) |
 | A-8 | M | MFA verification is not rate-limited per user/pre-auth session (only a per-IP path rule that is spoofable, see I-1). | 3 |
-| A-9 | M | TOTP secrets stored in plaintext. | 3 (encrypted at rest) |
+| A-9 | M | TOTP secrets stored in plaintext. | ✅ 2 (MultiFernet at rest) |
 | A-10 | M | Logout accepts GET (cross-site logout); MFA enrollment allowed without re-authentication from an existing session. | 3 |
 | A-11 | L | Session timeout identical for admins and students; no absolute session lifetime. | 3 |
 
@@ -74,7 +74,7 @@ lands (see `ARCHITECTURE.md` §9). ✅ = fixed in Phase 1 with a regression test
 | I-2 | H | `docker-compose.yml` makes the application's DB user the PostgreSQL **superuser** (`POSTGRES_USER`), ships a default password (`secure_postgres_pass`), and publishes Postgres (5432) and Redis (6379, no password) on all host interfaces. | ✅ 1 |
 | I-3 | M | Dockerfile runs as root, uses Python 3.14 image while dependencies were untested there; dev server (`runserver`) used in compose. | ✅ 1 |
 | I-4 | M | CSP allows `'unsafe-inline'` scripts and loads Tailwind's *runtime* compiler and Alpine from a CDN (no SRI). | 12 (self-hosted, compiled CSS, Alpine CSP build, nonces) |
-| I-5 | M | `AuditLog` immutability enforced only in `Model.save/delete`; `QuerySet.update()/delete()` and raw SQL bypass it. | 2 (ORM guard + DB trigger + DB privileges) |
+| I-5 | M | `AuditLog` immutability enforced only in `Model.save/delete`; `QuerySet.update()/delete()` and raw SQL bypass it. | ✅ 2 (ORM guard + DB trigger + DB privileges) |
 | I-6 | L | `CSRF_COOKIE_HTTPONLY=False` without need; `SECURE_BROWSER_XSS_FILTER` (obsolete header). | ✅ 1 |
 | I-7 | L | Production DB `sslmode=prefer` (silently falls back to plaintext). | ✅ 1 (`require` by default, configurable) |
 

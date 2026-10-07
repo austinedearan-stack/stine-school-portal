@@ -20,7 +20,9 @@ check → pytest on PostgreSQL 16 with coverage → `check --deploy` with produc
 | `tests/settings/` | production fail-fast checks (subprocess imports with controlled env), deploy checks, settings hygiene |
 | `tests/security/` | cross-cutting security tests: headers, CSRF, error pages, client IP spoofing, admin/media exposure, MFA bypass regression, log redaction |
 | `tests/test_repo_hygiene.py` | secret scan, forbidden patterns (`csrf_exempt`, raw SQL, `mark_safe`, `|safe`) |
-| `apps/<app>/tests/` | unit/integration tests per app (Phase 2+) |
+| `tests/models/` | Phase 2: DB constraints (check / unique / partial unique / exclusion), append-only ORM guard + DB triggers, capability catalog and role ceilings, seed command |
+| `tests/factories.py` | plain-function builders for fake test data (shared by every suite) |
+| `apps/<app>/tests/` | unit/integration tests per app (feature phases) |
 | `tests/authz_matrix/`, `tests/races/` | authorization matrix and PostgreSQL concurrency suites (Phases 3, 5, 7) |
 
 Markers: `postgres` (requires PostgreSQL — skipped on SQLite), `slow`.
@@ -35,6 +37,18 @@ Markers: `postgres` (requires PostgreSQL — skipped on SQLite), `slow`.
   (W021 HSTS-preload deliberately silenced while preload is off; see DEPLOYMENT.md).
 * Not verified in this environment: building the Docker image (the sandbox could not reach Docker Hub).
   The build's `collectstatic` step and `docker compose config` were verified separately.
+
+## Phase 2 results (2026-10-07)
+
+* 100 tests collected: 98 passed, 2 skipped on SQLite (Python 3.14.5, Django 5.2.18). The 2 skipped tests are
+  PostgreSQL-only (`TRUNCATE` refusal on audit tables, timetable exclusion constraint); no PostgreSQL server was
+  available in this environment, so they run in CI (PostgreSQL 16) only. **Not yet verified locally on PostgreSQL.**
+* Constraint tests violate each rule through the ORM's `create`/`update` (no form validation in the way) and
+  require `IntegrityError` from the database itself.
+* Append-only tests cover all four layers that exist at this point: ORM (`save`/`delete`/queryset `update`/`delete`/
+  `bulk_update` raise), DB triggers (raw `UPDATE`/`DELETE` refused on SQLite and PostgreSQL, `TRUNCATE` on
+  PostgreSQL), redaction of secret-like keys in `changes`, keyed hashing of attempted identifiers.
+* `ruff check .` clean; `bandit -ll` clean; `makemigrations --check` clean.
 
 ## Required categories (spec §35) — coverage plan
 

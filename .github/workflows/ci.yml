@@ -47,4 +47,8 @@ jobs:
           DB_USER: portal_app
           DB_SSLMODE: require
           REDIS_URL: redis://localhost:6379/0
-        run: python manage.py check --deploy --fail-level WARNING
+        run: |
+          # Throw-away keys generated for this check only.
+          export MFA_ENCRYPTION_KEYS="$(python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')"
+          export PORTAL_HMAC_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+          python manage.py check --deploy --fail-level WARNING

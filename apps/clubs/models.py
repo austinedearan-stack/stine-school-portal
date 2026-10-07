@@ -1,81 +1,104 @@
-import uuid
+"""Clubs and societies (DATABASE.md §2.5, ARCHITECTURE.md D10)."""
 
+from django.conf import settings
 from django.db import models
+from django.db.models import F, Q
+
+from apps.core.models import TimeStampedModel
 
 
-class Club(models.Model):
-    CATEGORY_CHOICES = (
-        ('ACADEMIC', 'Academic & Professional'),
-        ('TECHNOLOGY', 'Technology & Innovation'),
-        ('CULTURAL', 'Cultural & Arts'),
-        ('SPORTS', 'Sports & Recreation'),
-        ('COMMUNITY', 'Community Service & Charity'),
-    )
+class ClubKind(models.TextChoices):
+    CLUB = "CLUB", "Club"
+    SOCIETY = "SOCIETY", "Society"
 
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+class Club(TimeStampedModel):
+    kind = models.CharField(max_length=10, choices=ClubKind.choices, default=ClubKind.CLUB)
+    code = models.CharField(max_length=20, unique=True)
     name = models.CharField(max_length=150, unique=True)
-    code = models.CharField(max_length=30, unique=True, db_index=True)
-    category = models.CharField(max_length=30, choices=CATEGORY_CHOICES, default='ACADEMIC')
-    description = models.TextField()
-    advisor = models.ForeignKey('accounts.StaffProfile', null=True, blank=True, on_delete=models.SET_NULL, related_name='advised_clubs')
-    meeting_info = models.CharField(max_length=200, blank=True, help_text="e.g. Every Wednesday 4 PM, Student Center Rm 204")
-    email = models.EmailField(blank=True)
+    category = models.CharField(max_length=50, blank=True)
+    description = models.TextField(blank=True, max_length=5000)
+    advisor = models.ForeignKey(
+        "accounts.StaffProfile", null=True, blank=True, on_delete=models.SET_NULL, related_name="advised_clubs"
+    )
+    meeting_info = models.CharField(max_length=255, blank=True)
+    contact_email = models.EmailField(blank=True, help_text="Club address, never a personal one.")
+    requires_approval = models.BooleanField(default=True)
     is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ['name']
+        ordering = ["name"]
+        constraints = [models.CheckConstraint(condition=Q(kind__in=ClubKind.values), name="club_kind_valid")]
 
     def __str__(self):
         return self.name
 
-    @property
-    def active_members_count(self):
-        return self.memberships.filter(status='APPROVED').count()
+
+class MembershipStatus(models.TextChoices):
+    PENDING = "PENDING", "Pending"
+    APPROVED = "APPROVED", "Approved"
+    REJECTED = "REJECTED", "Rejected"
+    LEFT = "LEFT", "Left"
+    REMOVED = "REMOVED", "Removed"
 
 
-class ClubMembership(models.Model):
-    MEMBERSHIP_STATUS_CHOICES = (
-        ('PENDING', 'Pending Approval'),
-        ('APPROVED', 'Active Member'),
-        ('REJECTED', 'Application Rejected'),
-        ('LEFT', 'Former Member'),
+class Position(models.TextChoices):
+    MEMBER = "MEMBER", "Member"
+    SECRETARY = "SECRETARY", "Secretary"
+    TREASURER = "TREASURER", "Treasurer"
+    VICE_CHAIR = "VICE_CHAIR", "Vice chair"
+    CHAIR = "CHAIR", "Chair"
+
+
+class ClubMembership(TimeStampedModel):
+    club = models.ForeignKey(Club, on_delete=models.PROTECT, related_name="memberships")
+    student = models.ForeignKey("accounts.StudentProfile", on_delete=models.PROTECT, related_name="club_memberships")
+    status = models.CharField(max_length=10, choices=MembershipStatus.choices, default=MembershipStatus.PENDING)
+    position = models.CharField(max_length=12, choices=Position.choices, default=Position.MEMBER)
+    # Set only by a manage_clubs holder or the club's advisor; never by a student, never on one's own row.
+    can_manage_members = models.BooleanField(default=False)
+    decided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
     )
-    ROLE_CHOICES = (
-        ('MEMBER', 'General Member'),
-        ('OFFICER', 'Committee Officer'),
-        ('TREASURER', 'Treasurer'),
-        ('SECRETARY', 'Secretary'),
-        ('PRESIDENT', 'President'),
-    )
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    student = models.ForeignKey('accounts.StudentProfile', on_delete=models.CASCADE, related_name='club_memberships')
-    club = models.ForeignKey(Club, on_delete=models.CASCADE, related_name='memberships')
-    status = models.CharField(max_length=20, choices=MEMBERSHIP_STATUS_CHOICES, default='PENDING', db_index=True)
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='MEMBER')
-    applied_at = models.DateTimeField(auto_now_add=True)
-    approved_at = models.DateTimeField(null=True, blank=True)
+    decided_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        ordering = ['-applied_at']
-        unique_together = ('student', 'club')
+        ordering = ["club__name", "-created_at"]
+        constraints = [
+            models.CheckConstraint(condition=Q(status__in=MembershipStatus.values), name="membership_status_valid"),
+            models.CheckConstraint(condition=Q(position__in=Position.values), name="membership_position_valid"),
+            models.UniqueConstraint(
+                fields=["club", "student"],
+                condition=Q(status__in=[MembershipStatus.PENDING, MembershipStatus.APPROVED]),
+                name="membership_one_open_per_club",
+            ),
+        ]
 
     def __str__(self):
-        return f"{self.student.student_id} in {self.club.name} ({self.status})"
+        return f"{self.student_id} in {self.club_id} [{self.status}]"
 
 
-class ClubEvent(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    club = models.ForeignKey(Club, on_delete=models.CASCADE, related_name='events')
+class EventVisibility(models.TextChoices):
+    PUBLIC = "PUBLIC", "Everyone"
+    MEMBERS = "MEMBERS", "Members only"
+
+
+class ClubEvent(TimeStampedModel):
+    club = models.ForeignKey(Club, on_delete=models.PROTECT, related_name="events")
     title = models.CharField(max_length=200)
-    description = models.TextField()
-    event_date = models.DateTimeField()
-    location = models.CharField(max_length=150)
-    is_public = models.BooleanField(default=True)
+    description = models.TextField(blank=True, max_length=5000)
+    starts_at = models.DateTimeField()
+    ends_at = models.DateTimeField()
+    location = models.CharField(max_length=200, blank=True)
+    visibility = models.CharField(max_length=10, choices=EventVisibility.choices, default=EventVisibility.PUBLIC)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
 
     class Meta:
-        ordering = ['event_date']
+        ordering = ["starts_at"]
+        constraints = [
+            models.CheckConstraint(condition=Q(starts_at__lt=F("ends_at")), name="club_event_times_ordered"),
+            models.CheckConstraint(condition=Q(visibility__in=EventVisibility.values), name="club_event_visibility_valid"),
+        ]
 
     def __str__(self):
-        return f"{self.club.name}: {self.title} on {self.event_date.strftime('%Y-%m-%d %H:%M')}"
+        return f"{self.club} - {self.title}"

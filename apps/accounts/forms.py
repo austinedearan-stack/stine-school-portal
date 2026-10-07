@@ -3,12 +3,6 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 
 from apps.accounts.models import StudentProfile
-from apps.core.utils import (
-    ALLOWED_IMAGE_EXTENSIONS,
-    ALLOWED_IMAGE_MIMES,
-    MAX_PROFILE_PHOTO_SIZE,
-    validate_file_security,
-)
 
 
 class LoginForm(forms.Form):
@@ -42,7 +36,7 @@ class StudentProfileEditForm(forms.ModelForm):
         model = StudentProfile
         fields = [
             'phone',
-            'profile_photo',
+            'personal_email',
             'emergency_contact_name',
             'emergency_contact_phone',
             'emergency_contact_relationship',
@@ -53,17 +47,6 @@ class StudentProfileEditForm(forms.ModelForm):
             'emergency_contact_phone': forms.TextInput(attrs={'class': 'w-full px-3 py-2 border rounded-lg', 'placeholder': '+1 555-0198'}),
             'emergency_contact_relationship': forms.TextInput(attrs={'class': 'w-full px-3 py-2 border rounded-lg', 'placeholder': 'Parent / Guardian'}),
         }
-
-    def clean_profile_photo(self):
-        photo = self.cleaned_data.get('profile_photo')
-        if photo and hasattr(photo, 'file'):
-            validate_file_security(
-                uploaded_file=photo,
-                allowed_extensions=ALLOWED_IMAGE_EXTENSIONS,
-                allowed_mimes=ALLOWED_IMAGE_MIMES,
-                max_size_bytes=MAX_PROFILE_PHOTO_SIZE
-            )
-        return photo
 
 
 class PasswordChangeCustomForm(forms.Form):

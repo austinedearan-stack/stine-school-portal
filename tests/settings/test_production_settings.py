@@ -53,6 +53,10 @@ def test_secure_configuration_loads(py):
         ({"DB_SSLMODE": "prefer"}, "DB_SSLMODE"),
         ({"REDIS_URL": ""}, "REDIS_URL"),
         ({"DJANGO_CSRF_TRUSTED_ORIGINS": "http://portal.example.test"}, "https"),
+        ({"MFA_ENCRYPTION_KEYS": ""}, "MFA_ENCRYPTION_KEYS"),
+        ({"MFA_ENCRYPTION_KEYS": "not-a-fernet-key"}, "MFA_ENCRYPTION_KEYS"),
+        ({"PORTAL_HMAC_KEY": ""}, "PORTAL_HMAC_KEY"),
+        ({"PORTAL_HMAC_KEY": "too-short"}, "PORTAL_HMAC_KEY"),
     ],
 )
 def test_unsafe_configuration_is_refused(py, override, message):

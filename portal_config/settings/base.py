@@ -109,7 +109,17 @@ def database_from_env() -> dict:
     }
 
 
-DATABASES = {"default": database_from_env()}
+def with_audit_alias(default: dict) -> dict:
+    """Add the ``audit`` alias: the same database over an independent autocommit connection.
+
+    Security events and denial audits are written through it so they survive the rollback of the
+    request that caused them (ARCHITECTURE.md D16). Migrations never run on it (AuditRouter).
+    """
+    return {"default": default, "audit": {**default, "TEST": {"MIRROR": "default"}}}
+
+
+DATABASES = with_audit_alias(database_from_env())
+DATABASE_ROUTERS = ["apps.core.routers.AuditRouter"]
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # --- Authentication -------------------------------------------------------------------------------
@@ -132,6 +142,12 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
     {"NAME": "apps.accounts.validators.ComplexPasswordValidator"},
 ]
+
+# Keys for encrypting MFA secrets at rest (comma separated Fernet keys; first encrypts, all decrypt)
+# and for keyed hashing of one-time codes. Required in production; see .env.example.
+MFA_ENCRYPTION_KEYS = env_list("MFA_ENCRYPTION_KEYS")
+PORTAL_HMAC_KEY = env_str("PORTAL_HMAC_KEY")
+MFA_ISSUER_NAME = env_str("MFA_ISSUER_NAME", "University Student Portal")
 
 # --- Sessions, cookies, CSRF ----------------------------------------------------------------------
 SESSION_ENGINE = "django.contrib.sessions.backends.db"

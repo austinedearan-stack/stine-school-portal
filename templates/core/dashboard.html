@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1>Welcome, {{ user.get_short_name }}</h1>
+    <p>{{ user.get_role_display }} · {{ user.username }}</p>
+  </div>
+</div>
+<div class="card">
+  <p>Use the menu to open the services available to your account.</p>
+</div>
+{% endblock %}

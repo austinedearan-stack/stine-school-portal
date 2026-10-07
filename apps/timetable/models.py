@@ -1,68 +1,94 @@
-import uuid
+"""Venues, student groups and timetable entries (DATABASE.md §2.3).
 
-from django.core.exceptions import ValidationError
+Overlap protection has two layers: service validation (all engines, readable messages) and
+PostgreSQL exclusion constraints created in migration 0002 (concurrent clashing inserts impossible).
+"""
+
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.db.models import F, Q
+
+from apps.core.models import TimeStampedModel
 
 
-class Classroom(models.Model):
-    ROOM_TYPE_CHOICES = (
-        ('LECTURE_HALL', 'Lecture Hall'),
-        ('LABORATORY', 'Science/Computer Laboratory'),
-        ('SEMINAR_ROOM', 'Seminar Room'),
-        ('TUTORIAL_ROOM', 'Tutorial Room'),
-    )
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    code = models.CharField(max_length=50, unique=True, db_index=True)  # e.g., "LH-01"
-    name = models.CharField(max_length=100)
-    building = models.CharField(max_length=100)
-    campus = models.CharField(max_length=100, default='Main Campus')
-    capacity = models.PositiveIntegerField(default=50)
-    room_type = models.CharField(max_length=30, choices=ROOM_TYPE_CHOICES, default='LECTURE_HALL')
+class Venue(TimeStampedModel):
+    code = models.CharField(max_length=20, unique=True)
+    name = models.CharField(max_length=150)
+    campus = models.CharField(max_length=100, default="Main Campus")
+    building = models.CharField(max_length=100, blank=True)
+    capacity = models.PositiveIntegerField(default=30, validators=[MinValueValidator(1)])
+    venue_type = models.CharField(max_length=30, default="LECTURE_HALL")
+    is_active = models.BooleanField(default=True)
 
     class Meta:
-        ordering = ['building', 'code']
+        ordering = ["code"]
+        constraints = [models.CheckConstraint(condition=Q(capacity__gte=1), name="venue_capacity_positive")]
 
     def __str__(self):
-        return f"{self.code} - {self.name} ({self.building})"
+        return f"{self.code} - {self.name}"
 
 
-class TimetableEntry(models.Model):
-    DAY_CHOICES = (
-        ('MON', 'Monday'),
-        ('TUE', 'Tuesday'),
-        ('WED', 'Wednesday'),
-        ('THU', 'Thursday'),
-        ('FRI', 'Friday'),
-        ('SAT', 'Saturday'),
-        ('SUN', 'Sunday'),
-    )
-    CLASS_TYPE_CHOICES = (
-        ('LECTURE', 'Lecture'),
-        ('TUTORIAL', 'Tutorial'),
-        ('LAB', 'Laboratory Session'),
-        ('WORKSHOP', 'Workshop'),
-    )
-
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    unit = models.ForeignKey('academics.Unit', on_delete=models.CASCADE, related_name='timetable_entries')
-    classroom = models.ForeignKey(Classroom, on_delete=models.PROTECT, related_name='timetable_slots')
-    lecturer = models.ForeignKey('accounts.StaffProfile', null=True, blank=True, on_delete=models.SET_NULL, related_name='lectures')
-    semester = models.ForeignKey('academics.Semester', on_delete=models.CASCADE, related_name='timetable_entries')
-    day_of_week = models.CharField(max_length=3, choices=DAY_CHOICES, db_index=True)
-    start_time = models.TimeField()
-    end_time = models.TimeField()
-    class_type = models.CharField(max_length=20, choices=CLASS_TYPE_CHOICES, default='LECTURE')
+class StudentGroup(TimeStampedModel):
+    program = models.ForeignKey("academics.Program", on_delete=models.PROTECT, related_name="student_groups")
+    year_of_study = models.PositiveSmallIntegerField(validators=[MinValueValidator(1), MaxValueValidator(8)])
+    label = models.CharField(max_length=20)  # e.g. "G1"
 
     class Meta:
-        ordering = ['day_of_week', 'start_time']
-        indexes = [
-            models.Index(fields=['semester', 'day_of_week', 'start_time']),
-            models.Index(fields=['classroom', 'day_of_week']),
+        ordering = ["program__code", "year_of_study", "label"]
+        constraints = [
+            models.UniqueConstraint(fields=["program", "year_of_study", "label"], name="student_group_unique"),
+            models.CheckConstraint(
+                condition=Q(year_of_study__gte=1, year_of_study__lte=8), name="student_group_year_range"
+            ),
         ]
 
     def __str__(self):
-        return f"{self.unit.code} [{self.day_of_week} {self.start_time.strftime('%H:%M')}-{self.end_time.strftime('%H:%M')}] in {self.classroom.code}"
+        return f"{self.program.code} Y{self.year_of_study} {self.label}"
 
-    def clean(self):
-        if self.start_time and self.end_time and self.start_time >= self.end_time:
-            raise ValidationError("Class start time must be strictly earlier than end time.")
+
+class DayOfWeek(models.IntegerChoices):
+    MONDAY = 1, "Monday"
+    TUESDAY = 2, "Tuesday"
+    WEDNESDAY = 3, "Wednesday"
+    THURSDAY = 4, "Thursday"
+    FRIDAY = 5, "Friday"
+    SATURDAY = 6, "Saturday"
+    SUNDAY = 7, "Sunday"
+
+
+class ClassType(models.TextChoices):
+    LECTURE = "LECTURE", "Lecture"
+    TUTORIAL = "TUTORIAL", "Tutorial"
+    LAB = "LAB", "Lab"
+    WORKSHOP = "WORKSHOP", "Workshop"
+    EXAM = "EXAM", "Exam"
+
+
+class TimetableEntry(TimeStampedModel):
+    offering = models.ForeignKey("academics.UnitOffering", on_delete=models.CASCADE, related_name="timetable_entries")
+    # Denormalised from the offering; maintained by the timetable/offering services in one transaction.
+    semester = models.ForeignKey("academics.Semester", on_delete=models.PROTECT, related_name="timetable_entries")
+    lecturer = models.ForeignKey(
+        "accounts.StaffProfile", null=True, blank=True, on_delete=models.PROTECT, related_name="timetable_entries"
+    )
+    venue = models.ForeignKey(Venue, on_delete=models.PROTECT, related_name="timetable_entries")
+    day_of_week = models.PositiveSmallIntegerField(choices=DayOfWeek.choices)
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    class_type = models.CharField(max_length=10, choices=ClassType.choices, default=ClassType.LECTURE)
+    student_group = models.ForeignKey(
+        StudentGroup, null=True, blank=True, on_delete=models.PROTECT, related_name="timetable_entries"
+    )
+
+    class Meta:
+        ordering = ["day_of_week", "start_time"]
+        verbose_name_plural = "timetable entries"
+        indexes = [models.Index(fields=["venue", "day_of_week"]), models.Index(fields=["offering"])]
+        constraints = [
+            models.CheckConstraint(condition=Q(start_time__lt=F("end_time")), name="timetable_times_ordered"),
+            models.CheckConstraint(condition=Q(day_of_week__gte=1, day_of_week__lte=7), name="timetable_day_range"),
+            models.CheckConstraint(condition=Q(class_type__in=ClassType.values), name="timetable_class_type_valid"),
+        ]
+
+    def __str__(self):
+        return f"{self.offering} {self.get_day_of_week_display()} {self.start_time:%H:%M}-{self.end_time:%H:%M}"

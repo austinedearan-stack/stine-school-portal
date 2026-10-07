@@ -50,8 +50,9 @@ PATTERNS = {
 
 # Values that are clearly placeholders / references rather than secrets.
 # "?NAME" is the tail of a shell required-variable check: ${DB_PASSWORD:?DB_PASSWORD required}
+# "WORD_WORD" (upper-case words joined by underscores) is an enum/constant label, not a secret.
 PLACEHOLDER = re.compile(
-    r"^(\$\{?[A-Z_]+|\?[A-Z_]|<[^>]+>|change[-_]?me|replace[-_]?me|example|placeholder|your[-_]|x{6,}|\*{6,}|"
+    r"^(\$\{?[A-Z_]+|\?[A-Z_]|[A-Z]+(_[A-Z]+)+$|<[^>]+>|change[-_]?me|replace[-_]?me|example|placeholder|your[-_]|x{6,}|\*{6,}|"
     r"os\.environ|env(_str|_bool|_int|\()|getenv|settings\.|request\.|self\.|form\.|cleaned_data|"
     r"None|True|False|\[REDACTED\]|get_random_secret_key|make_password|forms\.|models\.)",
     re.IGNORECASE,

@@ -1,32 +1,16 @@
 def portal_context(request):
-    """
-    Context processor injecting portal-wide metadata, role booleans, and notification badge counts.
-    """
-    context = {
-        'portal_name': 'University Student Information Portal',
-        'is_student': False,
-        'is_staff': False,
-        'is_admin': False,
-        'is_superadmin': False,
-        'unread_notifications_count': 0,
-    }
+    """Portal-wide template context: role flags, navigation and the unread-notification badge."""
+    context = {"portal_name": "University Student Portal", "navigation": [], "unread_notifications_count": 0}
+    user = getattr(request, "user", None)
+    if user is None or not user.is_authenticated:
+        return context
 
-    if request.user.is_authenticated:
-        role = getattr(request.user, 'role', '')
-        context['current_role'] = role
-        context['is_student'] = (role == 'STUDENT')
-        context['is_staff'] = (role == 'STAFF')
-        context['is_admin'] = (role == 'ADMIN')
-        context['is_superadmin'] = (role == 'SUPERADMIN')
+    from apps.core.navigation import navigation_for
+    from apps.notifications.models import Notification
 
-        # Count unread notifications if app is loaded
-        try:
-            from apps.notifications.models import Notification
-            context['unread_notifications_count'] = Notification.objects.filter(
-                recipient=request.user,
-                is_read=False
-            ).count()
-        except Exception:
-            context['unread_notifications_count'] = 0
-
+    context.update(
+        current_role=user.role,
+        navigation=navigation_for(user),
+        unread_notifications_count=Notification.objects.filter(recipient=user, read_at__isnull=True).count(),
+    )
     return context

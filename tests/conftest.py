@@ -1,9 +1,11 @@
 import os
+import secrets
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
+from cryptography.fernet import Fernet
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -32,4 +34,19 @@ PROD_ENV = {
     "DB_USER": "portal_app",
     "DB_PASSWORD": "unused-in-settings-import",  # secret-scan: allow
     "REDIS_URL": "redis://localhost:6379/0",
+    # Generated per test run; never a stored value.
+    "MFA_ENCRYPTION_KEYS": Fernet.generate_key().decode(),
+    "PORTAL_HMAC_KEY": secrets.token_urlsafe(48),
 }
+
+
+def pytest_collection_modifyitems(config, items):
+    """Skip tests marked ``postgres`` unless the suite runs against PostgreSQL."""
+    from django.conf import settings
+
+    if settings.DATABASES["default"]["ENGINE"].endswith("postgresql"):
+        return
+    skip = pytest.mark.skip(reason="requires PostgreSQL (DB_ENGINE=postgresql)")
+    for item in items:
+        if "postgres" in item.keywords:
+            item.add_marker(skip)

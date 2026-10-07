@@ -9,7 +9,9 @@ import pyotp
 import pytest
 from django.urls import reverse
 
-from apps.accounts.models import User
+from apps.accounts.models import MFADevice, User
+from apps.accounts.services import enroll_device
+from apps.core.crypto import decrypt
 
 PASSWORD = "Adm1n!Test-Passphrase"  # test fixture only  # secret-scan: allow
 
@@ -19,9 +21,7 @@ def mfa_admin(db):
     user = User.objects.create_user(
         username="admin001", email="admin@example.test", password=PASSWORD, role="ADMIN"
     )
-    user.mfa_secret = pyotp.random_base32()
-    user.is_mfa_enabled = True
-    user.save()
+    enroll_device(user, pyotp.random_base32())
     return user
 
 
@@ -46,17 +46,16 @@ def test_preauth_session_cannot_complete_enrollment_by_posting(client, mfa_admin
     session.save()
     response = client.post(reverse("accounts:mfa_setup"), {"code": pyotp.TOTP(attacker_secret).now()})
     assert response.status_code == 302
-    mfa_admin.refresh_from_db()
-    assert mfa_admin.mfa_secret != attacker_secret
+    assert decrypt(MFADevice.objects.get(user=mfa_admin).secret_encrypted) != attacker_secret
     assert "_auth_user_id" not in client.session
 
 
 def test_blocked_attempt_is_recorded_as_security_event(client, mfa_admin):
-    from apps.core.models import SecurityEventLog
+    from apps.core.models import SecurityEvent
 
     _password_step(client, mfa_admin)
     client.get(reverse("accounts:mfa_setup"))
-    assert SecurityEventLog.objects.filter(
+    assert SecurityEvent.objects.filter(
         event_type="MFA_FAILURE", user=mfa_admin, details__reason="enrollment_blocked_device_exists"
     ).exists()
 

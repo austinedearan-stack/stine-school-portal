@@ -4,10 +4,20 @@ Fails fast (ImproperlyConfigured) on any unsafe or missing configuration instead
 falling back to insecure defaults.
 """
 
+from cryptography.fernet import Fernet
 from django.core.exceptions import ImproperlyConfigured
 
 from .base import *  # noqa: F403
-from .base import ALLOWED_HOSTS, DJANGO_ADMIN_ENABLED, SECRET_KEY, TRUSTED_PROXY_COUNT, database_from_env
+from .base import (
+    ALLOWED_HOSTS,
+    DJANGO_ADMIN_ENABLED,
+    MFA_ENCRYPTION_KEYS,
+    PORTAL_HMAC_KEY,
+    SECRET_KEY,
+    TRUSTED_PROXY_COUNT,
+    database_from_env,
+    with_audit_alias,
+)
 from .env import env_bool, env_int, env_list, env_str
 
 DEBUG = False
@@ -22,13 +32,25 @@ if DJANGO_ADMIN_ENABLED:
         "DJANGO_ADMIN_ENABLED must not be set in production: the stock admin bypasses MFA, policies and audit."
     )
 
+if not MFA_ENCRYPTION_KEYS:
+    raise ImproperlyConfigured("MFA_ENCRYPTION_KEYS must list at least one Fernet key (see .env.example).")
+for _key in MFA_ENCRYPTION_KEYS:
+    try:
+        Fernet(_key.encode())
+    except (ValueError, TypeError) as _exc:
+        raise ImproperlyConfigured("MFA_ENCRYPTION_KEYS contains an invalid Fernet key.") from _exc
+if not PORTAL_HMAC_KEY or len(PORTAL_HMAC_KEY) < 32 or PORTAL_HMAC_KEY == SECRET_KEY:
+    raise ImproperlyConfigured(
+        "PORTAL_HMAC_KEY must be a random value of at least 32 characters, independent of DJANGO_SECRET_KEY."
+    )
+
 CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
 for origin in CSRF_TRUSTED_ORIGINS:
     if not origin.startswith("https://"):
         raise ImproperlyConfigured("DJANGO_CSRF_TRUSTED_ORIGINS entries must be https:// origins.")
 
 # --- Database: PostgreSQL only, encrypted by default, never the superuser -------------------------
-DATABASES = {"default": database_from_env()}
+DATABASES = with_audit_alias(database_from_env())
 if DATABASES["default"]["ENGINE"] != "django.db.backends.postgresql":
     raise ImproperlyConfigured("Production requires PostgreSQL (DB_ENGINE=postgresql).")
 if not DATABASES["default"].get("PASSWORD"):

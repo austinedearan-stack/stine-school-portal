@@ -5,18 +5,25 @@ in-memory SQLite database. The secret key is random per run: no secret is stored
 """
 
 import os
+import secrets
 
+from cryptography.fernet import Fernet
 from django.core.management.utils import get_random_secret_key
 
 from .base import *  # noqa: F403
 from .base import database_from_env
 
 SECRET_KEY = get_random_secret_key()
+MFA_ENCRYPTION_KEYS = [Fernet.generate_key().decode()]
+PORTAL_HMAC_KEY = secrets.token_urlsafe(48)
 DEBUG = False
 ALLOWED_HOSTS = ["testserver", "localhost"]
 
 if os.environ.get("DB_ENGINE", "sqlite").lower() == "postgresql":
     DATABASES = {"default": database_from_env()}
+    # Lets the test runner (as table owner) flush append-only tables between transactional tests.
+    # Tests of the append-only trigger switch it off with SET LOCAL. See apps/core/db_guards.py.
+    DATABASES["default"]["OPTIONS"]["options"] = "-c portal.audit_maintenance=on"
 else:
     DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": ":memory:"}}
 

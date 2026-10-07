@@ -1,9 +1,19 @@
 # Database Design
 
-Status: **design baseline (Phase 1)**. Models are implemented in Phase 2. The `0001_initial` migrations committed
-in Phase 1 are **provisional**: generated from the inherited models only so the test suite runs on PostgreSQL
-(unmigrated apps cannot reference `auth_group`). Nothing has been deployed, so Phase 2 replaces them with fresh
-initial migrations for the schema below.
+Status: **implemented (Phase 2)**. The provisional Phase 1 migrations were replaced by fresh initial migrations.
+
+Implementation notes (deliberate, minor deviations from the design text below):
+* Optional short text fields (`UnitRegistration.grade`, `StudentProfile.gender`) use `""` instead of NULL
+  (Django convention); the CHECK constraints allow `""` or a value from the vocabulary.
+* `HostelApplication.preferred_hostels` uses the through table `HostelPreference(application, hostel, rank)` with
+  U(application, rank) and U(application, hostel).
+* `UnitRegistration.registered_by` (nullable) records the admin who used a registration override.
+* `HostelAllocation.ended_at` records when an allocation stopped holding its bed.
+* `seq` on append-only tables: PostgreSQL assigns it in a `BEFORE INSERT` trigger from a per-table sequence;
+  other engines (development/test only) assign max+1 in the ORM.
+* Append-only triggers allow mutation only in a deliberate maintenance session that sets
+  `portal.audit_maintenance = 'on'` **and** connects as the table owner (migration role) — used by the test
+  runner to flush tables; the runtime role can do neither.
 
 Engine: PostgreSQL 16 (production, CI, concurrency tests). SQLite is allowed for quick local
 development only; tests that depend on row locking are marked `postgres` and skipped on SQLite.

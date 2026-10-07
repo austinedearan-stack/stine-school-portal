@@ -1,8 +1,13 @@
+import uuid
+
 from django.core.cache import cache
 from django.http import HttpResponse
 from django.template.loader import render_to_string
 
-from apps.core.utils import get_client_ip, log_security_event
+from apps.core.audit import record_security_event
+from apps.core.context import RequestContext
+from apps.core.models import SecurityEventType
+from apps.core.utils import get_client_ip
 
 
 class SecurityHeadersMiddleware:
@@ -63,12 +68,10 @@ class RateLimitMiddleware:
             current_requests = cache.get(cache_key, 0)
 
             if current_requests >= matched_rule['limit']:
-                log_security_event(
-                    event_type='RATE_LIMIT_EXCEEDED',
-                    ip_address=ip,
-                    user_agent=request.META.get('HTTP_USER_AGENT', ''),
-                    endpoint=path,
-                    details={'limit': matched_rule['limit'], 'window': matched_rule['window']}
+                record_security_event(
+                    SecurityEventType.RATE_LIMITED,
+                    ctx=RequestContext.from_request(request),
+                    details={'limit': matched_rule['limit'], 'window': matched_rule['window']},
                 )
                 html = render_to_string('errors/429.html', {'message': 'Too many requests. Please wait a moment and try again.'})
                 response = HttpResponse(html, status=429)
@@ -85,13 +88,17 @@ class RateLimitMiddleware:
 
 
 class AuditLoggingMiddleware:
-    """
-    Enriches requests with client metadata (IP, user agent) for clean audit logging.
-    """
+    """Attaches request metadata (client IP, user agent, request id) used by audit records."""
+
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
+        incoming = request.META.get("HTTP_X_REQUEST_ID", "")
+        # Accept a proxy-supplied request id only if it is a plain token; otherwise generate one.
+        request.request_id = incoming[:64] if incoming and incoming.replace("-", "").isalnum() else uuid.uuid4().hex
         request.client_ip = get_client_ip(request)
-        request.client_user_agent = request.META.get('HTTP_USER_AGENT', '')
-        return self.get_response(request)
+        request.client_user_agent = request.META.get("HTTP_USER_AGENT", "")[:256]
+        response = self.get_response(request)
+        response["X-Request-ID"] = request.request_id
+        return response

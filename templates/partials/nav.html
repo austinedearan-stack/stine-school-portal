@@ -1,0 +1,4 @@
+{% for section, items in navigation %}
+  <div class="section-title">{{ section }}</div>
+  {% for item in items %}<a href="{{ item.url }}"{% if request.path == item.url %} class="active" aria-current="page"{% endif %}>{{ item.label }}</a>{% endfor %}
+{% endfor %}
