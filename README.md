@@ -19,11 +19,28 @@ the project brief, with the server — not the browser — enforcing every secur
 | 9 | Requests & transfers | **Done** — see below |
 | 10 | Admin panel | **Done** — see below |
 | 11 | Notifications & announcements | **Done** — see below |
-| 12–15 | Hardening, testing, adversarial testing, deployment | Not started |
+| 12 | Security hardening | **Done** — see below |
+| 13 | Automated testing | Not started |
+| 14 | Adversarial testing | Not started |
+| 15 | Deployment preparation | Not started |
 
 **All specified modules are implemented and tested (Phases 1–11).** Security hardening, the full test and
 adversarial campaigns and deployment preparation (Phases 12–15) are still to come; do not deploy to
 production before they are complete.
+
+Phase 12 delivered:
+
+* Strict CSP with no CDN, no inline script or style and no JavaScript at all (pages are plain HTML forms), plus
+  `object-src`/`frame-src`/`base-uri` locked down and `upgrade-insecure-requests`; COOP, CORP, Permissions-Policy,
+  `no-store` caching for authenticated pages, `security.txt` and `robots.txt`.
+* Request-size cap checked from `Content-Length` before the body is read (413), a coarse per-user/IP cap on
+  state-changing requests (fail-open, D17) on top of the fail-closed authentication throttles.
+* Request ids on every response, audit row and log line.
+* Tamper evidence for the append-only streams: `manage.py seal_audit_log` hash-chains settled rows into
+  `AuditSeal`s (copied to the log stream); `manage.py verify_audit_seals` detects edited, deleted, replaced or
+  inserted rows and broken chains (exit code 1 for monitoring).
+* Automated sweep: every URL in the project refuses anonymous users (except a short public allowlist) and every
+  administrative URL refuses students.
 
 Phase 11 delivered:
 

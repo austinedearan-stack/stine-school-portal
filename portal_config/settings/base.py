@@ -51,6 +51,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "apps.core.middleware.RequestContextMiddleware",
+    "apps.core.middleware.RequestSizeLimitMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -58,6 +59,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "apps.core.middleware.SessionPolicyMiddleware",
+    "apps.core.middleware.UnsafeMethodThrottleMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "apps.core.middleware.SecurityHeadersMiddleware",
 ]
@@ -179,7 +181,11 @@ X_FRAME_OPTIONS = "DENY"
 DATA_UPLOAD_MAX_MEMORY_SIZE = 2_621_440  # 2.5 MiB of non-file form data
 FILE_UPLOAD_MAX_MEMORY_SIZE = 2_621_440
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 200
-DATA_UPLOAD_MAX_NUMBER_FILES = 5
+DATA_UPLOAD_MAX_NUMBER_FILES = 10
+# Hard cap on any request body, checked from Content-Length before the body is read (Nginx enforces it too).
+MAX_REQUEST_BYTES = env_int("MAX_REQUEST_BYTES", 12 * 1024 * 1024, minimum=1024 * 1024)
+# Coarse per-user/IP cap on state-changing requests per minute (0 disables); auth endpoints have their own limits.
+UNSAFE_REQUESTS_PER_MINUTE = env_int("UNSAFE_REQUESTS_PER_MINUTE", 120, minimum=0)
 
 # --- Internationalisation -------------------------------------------------------------------------
 LANGUAGE_CODE = "en"
@@ -229,6 +235,7 @@ REST_FRAMEWORK = {
 }
 
 # --- Email ----------------------------------------------------------------------------------------
+SECURITY_CONTACT = env_str("SECURITY_CONTACT", "mailto:security@example.test")
 # Notification kinds that also get an email copy via the outbox (empty = in-app only).
 NOTIFICATION_EMAIL_KINDS = env_list("NOTIFICATION_EMAIL_KINDS")
 DEFAULT_FROM_EMAIL = env_str("DEFAULT_FROM_EMAIL", "no-reply@example.test")
@@ -239,10 +246,13 @@ LOG_LEVEL = env_str("LOG_LEVEL", "INFO")
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
-    "filters": {"redact": {"()": "apps.core.logging.RedactSecretsFilter"}},
+    "filters": {
+        "redact": {"()": "apps.core.logging.RedactSecretsFilter"},
+        "request_id": {"()": "apps.core.logging.RequestIdFilter"},
+    },
     "formatters": {"json": {"()": "apps.core.logging.JsonFormatter"}},
     "handlers": {
-        "console": {"class": "logging.StreamHandler", "formatter": "json", "filters": ["redact"]},
+        "console": {"class": "logging.StreamHandler", "formatter": "json", "filters": ["request_id", "redact"]},
     },
     "root": {"handlers": ["console"], "level": LOG_LEVEL},
     "loggers": {

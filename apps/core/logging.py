@@ -56,6 +56,17 @@ class RedactSecretsFilter(logging.Filter):
 _STANDARD_ATTRS = set(vars(logging.LogRecord("", 0, "", 0, "", (), None))) | {"message", "asctime"}
 
 
+class RequestIdFilter(logging.Filter):
+    """Adds the current request id to every log record so log lines can be joined with audit rows."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        from apps.core.middleware import CURRENT_REQUEST_ID
+
+        if not getattr(record, "request_id", ""):
+            record.request_id = CURRENT_REQUEST_ID.get()
+        return True
+
+
 class JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         payload = {

@@ -123,6 +123,13 @@ Markers: `postgres` (requires PostgreSQL — skipped on SQLite), `slow`.
   staff publishing limits (department, offerings, individual recipients), withdrawal rights, POST-only read state and
   cross-user isolation (Z-10), link allowlist, opt-in email outbox.
 
+## Phase 12 results (2026-10-08)
+
+* 372 passed, 9 skipped (PostgreSQL-only). `tests/security/test_hardening.py` (14): 413 before reading, unsafe-method
+  throttle, CSP/headers, request-id sanitising and log propagation, security.txt/robots.txt, audit seals (verify,
+  chaining, grace window, edited / deleted / replaced rows detected after bypassing the triggers), URL sweep for
+  anonymous users and for students on administrative pages; template hygiene (no inline script/style).
+
 ## Required categories (spec §35) — coverage plan
 
 | Category | Phase(s) |

@@ -40,3 +40,4 @@ MEDIA_ROOT = BASE_DIR / "var" / "test-private-media"  # noqa: F405
 DJANGO_ADMIN_ENABLED = False
 
 AUDIT_INDEPENDENT_CONNECTION = False
+UNSAFE_REQUESTS_PER_MINUTE = 0  # enabled per test (tests/security/test_hardening.py)

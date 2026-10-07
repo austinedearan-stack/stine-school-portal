@@ -1,10 +1,12 @@
 from django.conf import settings
 from django.urls import include, path
 
-from apps.core.views import health_view
+from apps.core.views import health_view, robots_txt_view, security_txt_view
 
 urlpatterns = [
     path("healthz", health_view, name="health"),
+    path(".well-known/security.txt", security_txt_view, name="security_txt"),
+    path("robots.txt", robots_txt_view, name="robots_txt"),
     path("", include("apps.core.urls")),
     path("accounts/", include("apps.accounts.urls")),
     path("academics/", include("apps.academics.urls")),

@@ -73,7 +73,7 @@ lands (see `ARCHITECTURE.md` §9). ✅ = fixed in Phase 1 with a regression test
 | I-1 | H | `get_client_ip` trusts the client-controlled `X-Forwarded-For` header unconditionally → rate limits bypassable and audit IPs forgeable. | ✅ 1 |
 | I-2 | H | `docker-compose.yml` makes the application's DB user the PostgreSQL **superuser** (`POSTGRES_USER`), ships a default password (`secure_postgres_pass`), and publishes Postgres (5432) and Redis (6379, no password) on all host interfaces. | ✅ 1 |
 | I-3 | M | Dockerfile runs as root, uses Python 3.14 image while dependencies were untested there; dev server (`runserver`) used in compose. | ✅ 1 |
-| I-4 | M | CSP allows `'unsafe-inline'` scripts and loads Tailwind's *runtime* compiler and Alpine from a CDN (no SRI). | 12 (self-hosted, compiled CSS, Alpine CSP build, nonces) |
+| I-4 | M | CSP allows `'unsafe-inline'` scripts and loads Tailwind's *runtime* compiler and Alpine from a CDN (no SRI). | ✅ 12 (no CDN, no inline script/style; the UI needs no JavaScript, so no nonces are required) |
 | I-5 | M | `AuditLog` immutability enforced only in `Model.save/delete`; `QuerySet.update()/delete()` and raw SQL bypass it. | ✅ 2 (ORM guard + DB trigger + DB privileges) |
 | I-6 | L | `CSRF_COOKIE_HTTPONLY=False` without need; `SECURE_BROWSER_XSS_FILTER` (obsolete header). | ✅ 1 |
 | I-7 | L | Production DB `sslmode=prefer` (silently falls back to plaintext). | ✅ 1 (`require` by default, configurable) |

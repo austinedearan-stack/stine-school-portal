@@ -45,3 +45,27 @@ def csrf_failure_view(request, reason=""):
 def health_view(request):
     """Liveness probe for the container orchestrator. Reveals nothing about the system."""
     return HttpResponse("ok", content_type="text/plain")
+
+
+@never_cache
+@require_GET
+def security_txt_view(request):
+    """RFC 9116 contact information for reporting vulnerabilities."""
+    from datetime import timedelta
+
+    from django.conf import settings
+    from django.utils import timezone
+
+    expires = (timezone.now() + timedelta(days=365)).strftime("%Y-%m-%dT00:00:00Z")
+    lines = [
+        f"Contact: {settings.SECURITY_CONTACT}",
+        f"Expires: {expires}",
+        "Preferred-Languages: en",
+        "Policy: Do not access, modify or download other users' data. Report privately; do not open public issues.",
+    ]
+    return HttpResponse("\n".join(lines) + "\n", content_type="text/plain; charset=utf-8")
+
+
+@require_GET
+def robots_txt_view(request):
+    return HttpResponse("User-agent: *\nDisallow: /\n", content_type="text/plain")
