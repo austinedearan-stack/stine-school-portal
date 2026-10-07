@@ -1,7 +1,9 @@
 # Database Design
 
-Status: **design baseline (Phase 1)**. Models and migrations are implemented in Phase 2; until then the
-inherited models in `apps/*/models.py` are *not* authoritative and have no migrations.
+Status: **design baseline (Phase 1)**. Models are implemented in Phase 2. The `0001_initial` migrations committed
+in Phase 1 are **provisional**: generated from the inherited models only so the test suite runs on PostgreSQL
+(unmigrated apps cannot reference `auth_group`). Nothing has been deployed, so Phase 2 replaces them with fresh
+initial migrations for the schema below.
 
 Engine: PostgreSQL 16 (production, CI, concurrency tests). SQLite is allowed for quick local
 development only; tests that depend on row locking are marked `postgres` and skipped on SQLite.

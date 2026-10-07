@@ -1,47 +1,29 @@
-# Backup and Recovery Procedures
+# Backup and Restore
 
-## 1. Backup Strategy
-A complete backup consists of:
-1. **Relational Database**: PostgreSQL SQL dump or SQLite binary snapshot.
-2. **Media Storage**: Uploaded files (profile photos, ticket attachments).
-3. **Configuration & Secrets**: Environment variables and encryption keys (stored securely in secret managers).
+Status: **strategy defined; scripts and the automated restore test are delivered in Phase 15.**
+A backup that has never been restored is **not** considered verified.
 
-## 2. Automated Backup Execution
+## What is backed up
 
-### PostgreSQL Backup:
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-BACKUP_DIR="/var/backups/school_portal"
-TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-mkdir -p "${BACKUP_DIR}"
+| Data | Method | Frequency | Retention |
+|---|---|---|---|
+| PostgreSQL database | `pg_dump --format=custom` as `portal_owner` (+ WAL archiving for point-in-time recovery in production) | nightly full; WAL continuous | 7 daily, 4 weekly, 12 monthly |
+| Private uploads (`PRIVATE_MEDIA_ROOT`) | `tar` + SHA-256 manifest | nightly | same as database |
+| Configuration | infrastructure-as-code in git; secrets in the secret store (never in backups of the repo) | on change | git history |
 
-pg_dump -U "${DB_USER}" -h "${DB_HOST}" -Fc "${DB_NAME}" > "${BACKUP_DIR}/db_${TIMESTAMP}.dump"
-tar -czf "${BACKUP_DIR}/media_${TIMESTAMP}.tar.gz" -C /app media/
+Backups are encrypted at rest (e.g. `age`/GPG with a key held outside the backup location), copied
+off-host, and readable only by the backup operator role. They contain personal data: access is logged and
+restricted (`manage_backups` in the portal can trigger/verify, never download).
 
-# Retain 14 days of backups
-find "${BACKUP_DIR}" -name "*.dump" -mtime +14 -delete
-find "${BACKUP_DIR}" -name "*.tar.gz" -mtime +14 -delete
-```
+## Restore procedure (outline)
 
-## 3. Restoration Test Procedure
-**A backup is not considered verified until tested in a staging restoration container.**
+1. Provision an empty PostgreSQL 16 instance and run `deploy/postgres/init/01-roles.sh`.
+2. `pg_restore --no-owner --role=portal_owner -d school_portal <dump>`; re-apply grants (script, Phase 15).
+3. Extract the uploads archive into `PRIVATE_MEDIA_ROOT`; verify the SHA-256 manifest.
+4. `python manage.py migrate --check` and `python manage.py verify_audit_seals` (Phase 2).
+5. Smoke test: log in as a test account, open a request attachment, check row counts against the backup manifest.
 
-### Step-by-Step Restoration Verification:
-1. Spin up an isolated target database container:
-   ```bash
-   docker run --name pg-restore-test -e POSTGRES_PASSWORD=test -d postgres:16
-   ```
-2. Restore database from dump:
-   ```bash
-   pg_restore -U postgres -h localhost -d restore_test_db db_snapshot.dump
-   ```
-3. Run schema verification script:
-   ```bash
-   python manage.py check --database default
-   python manage.py test apps.academics.tests apps.hostels.tests
-   ```
-4. Extract media files and verify checksums:
-   ```bash
-   tar -xzf media_snapshot.tar.gz -C /restore_media/
-   ```
+## Restore test (Phase 15 deliverable)
+
+`scripts/restore_test.sh` will restore the latest backup into a scratch database, run the checks above and
+fail loudly on any mismatch. It runs on a schedule; its last result is visible to SUPERADMINs.

@@ -1,43 +1,59 @@
-# Deployment Guide
+# Deployment
 
-## 1. Production Deployment Topology
-The production deployment uses Docker containers managed via Docker Compose:
-- **Web App**: Gunicorn WSGI server behind an Nginx reverse proxy.
-- **Database**: PostgreSQL 16+ with dedicated, non-superuser credentials.
-- **Cache & Throttling**: Redis 7+.
+Status: Phase 1 provides the production *settings*, the Docker image definition and the PostgreSQL role
+bootstrap. The production compose file, Nginx configuration and runbooks are completed in Phase 15.
 
-## 2. Docker Compose Configuration
-See [`docker-compose.yml`](file:///c:/Users/deara/OneDrive/Documents/projects/school%20portal/docker-compose.yml) and [`Dockerfile`](file:///c:/Users/deara/OneDrive/Documents/projects/school%20portal/Dockerfile).
+## Production settings contract (`portal_config.settings.production`)
 
-### Build and Launch:
+The process refuses to start (ImproperlyConfigured) unless:
+
+| Variable | Rule |
+|---|---|
+| `DJANGO_SECRET_KEY` | ≥ 50 random characters, not `django-insecure…` |
+| `DJANGO_ALLOWED_HOSTS` | explicit host names, no `*` |
+| `DJANGO_CSRF_TRUSTED_ORIGINS` | optional; `https://` origins only |
+| `DB_ENGINE` | `postgresql` |
+| `DB_USER` / `DB_PASSWORD` | the **runtime** role (`portal_app`); not `postgres`/`root`/`admin`; password required |
+| `DB_SSLMODE` | `require` (default), `verify-ca` or `verify-full`; weaker modes only with `DB_ALLOW_INSECURE_TRANSPORT=true` for a private network |
+| `REDIS_URL` | required (rate limiting must be shared across workers) |
+| `DJANGO_ADMIN_ENABLED` | must be unset/false |
+| `TRUSTED_PROXY_COUNT` | number of reverse proxies that append to `X-Forwarded-For` (1 behind Nginx); enables `X-Forwarded-Proto` trust |
+
+`wsgi.py`/`asgi.py` default to production settings, so a server started without `DJANGO_SETTINGS_MODULE`
+never runs with DEBUG.
+
+Verify before every release:
+
 ```bash
-docker compose build
-docker compose up -d
-docker compose exec web python manage.py migrate
-docker compose exec web python manage.py collectstatic --noinput
+DJANGO_SETTINGS_MODULE=portal_config.settings.production python manage.py check --deploy --fail-level WARNING
 ```
 
-## 3. Environment Variables (Production)
-Set the following in `.env`:
-- `ENVIRONMENT=production`
-- `SECRET_KEY=<generate-at-least-50-characters-random-string>`
-- `DEBUG=False`
-- `ALLOWED_HOSTS=portal.university.edu`
-- `DB_ENGINE=postgresql`
-- `DB_NAME=university_portal`
-- `DB_USER=portal_app_user`
-- `DB_PASSWORD=<strong_password>`
-- `DB_HOST=db`
-- `DB_PORT=5432`
-- `SECURE_SSL_REDIRECT=True`
-- `SESSION_COOKIE_SECURE=True`
-- `CSRF_COOKIE_SECURE=True`
+HSTS preload is **off** by default (`SECURE_HSTS_PRELOAD=false`; Django's W021 is silenced only in that case).
+Enable it only when every subdomain is permanently HTTPS — removal from browser preload lists takes months.
 
-## 4. PostgreSQL Hardening
-- Create a dedicated non-superuser role:
-```sql
-CREATE USER portal_app_user WITH PASSWORD 'strong_password';
-CREATE DATABASE university_portal OWNER portal_app_user;
-REVOKE ALL ON DATABASE university_portal FROM PUBLIC;
-GRANT ALL PRIVILEGES ON DATABASE university_portal TO portal_app_user;
-```
+## Database roles
+
+`deploy/postgres/init/01-roles.sh` (run once by the PostgreSQL bootstrap superuser) creates:
+
+* `portal_owner` — owns the database and schema; used **only** for `python manage.py migrate`.
+* `portal_app` — runtime role: `CONNECT`, schema `USAGE`, DML on tables created by the owner; cannot create
+  or alter tables; `statement_timeout=30s`, `idle_in_transaction_session_timeout=5min`.
+* `btree_gist` extension (for timetable exclusion constraints).
+
+Migrations: run with `DB_USER=$DB_OWNER_USER DB_PASSWORD=$DB_OWNER_PASSWORD python manage.py migrate`
+(the compose `migrate` service does this). The web process always uses `portal_app`.
+
+## Image
+
+`Dockerfile`: multi-stage, `python:3.13-slim`, wheels built in a builder stage, runs as the unprivileged
+`portal` user, static files collected at build time with build-only settings (random key, no DB),
+Gunicorn on :8000, `/healthz` health check. Private uploads live in `/app/var/private-media` (mount a volume).
+
+## Secret rotation runbook (summary)
+
+1. Generate the new value (`python -c "import secrets; print(secrets.token_urlsafe(64))"`).
+2. Update the secret store / environment; for `DJANGO_SECRET_KEY` keep the old key in `DJANGO_SECRET_KEY_FALLBACKS`
+   for one session lifetime (wired in Phase 3).
+3. Restart the web processes; verify `/healthz` and `check --deploy`.
+4. Revoke the old value (DB: `ALTER ROLE portal_app PASSWORD '<new>'` executed **before** step 3).
+5. Record the rotation in the operations log (who, when, why — never the value).

@@ -1,90 +1,76 @@
-# Full-Stack University Student Portal
+# University Student Portal
 
-A production-grade, highly secure, full-stack university student information and services portal built with **Python / Django 5**, **Django REST Framework**, and **Tailwind CSS**.
+A Django-based student information and services portal (units, timetable, hostels, clubs,
+student requests and transfers, notifications, administration) built to the specification in
+the project brief, with the server — not the browser — enforcing every security rule.
 
----
+## Project status (honest)
 
-## 🏛️ Features Overview
+| Phase | Scope | Status |
+|---|---|---|
+| 1 | Architecture, requirements, foundation hardening | **Done** — see below |
+| 2 | Models & migrations (schema of `DATABASE.md`) | Not started |
+| 3 | Authentication & authorization | Not started (inherited login exists but is **not** trusted — see `docs/AUDIT_EXISTING_CODE.md`) |
+| 4–11 | Feature modules | Not started (inherited views exist; many render missing templates) |
+| 12–15 | Hardening, testing, adversarial testing, deployment | Not started |
 
-- **Role-Based Access Control (RBAC)**: Strict segregation between `STUDENT`, `STAFF`, `ADMIN`, and `SUPERADMIN`. All authorization enforced server-side.
-- **Authentication & Security**:
-  - Argon2 password hashing (`Argon2PasswordHasher`).
-  - RFC 6238 TOTP Multi-Factor Authentication (MFA) for administrative roles.
-  - Progressive rate limiting & account lockout on brute-force detection.
-  - Session rotation on login to defeat session fixation.
-  - Generic authentication errors (no account enumeration).
-- **Student Dashboard & Profile**:
-  - Live summary of units, timetable, hostel status, requests, and announcements.
-  - Separation of institutional read-only data from student-editable data.
-  - Secure profile photo upload pipeline with MIME & magic byte inspection.
-- **Academic Units & Registration**:
-  - Unit catalog browsing with prerequisite validation and credit load constraints.
-  - Atomic transactions preventing over-enrollment and duplicate registration.
-- **Timetable Management**:
-  - Interactive weekly schedule grid.
-  - Multi-dimensional clash detection (room conflict, lecturer conflict, cohort conflict).
-- **Hostel Booking & Allocation**:
-  - Hostel, building, floor, room, and bed hierarchy.
-  - **Zero-race-condition bed booking** using atomic transactions and row-level locking (`select_for_update`).
-- **Clubs & Societies**:
-  - Club discovery, event management, and structured membership application workflow.
-- **Unified Student Requests & Transfers**:
-  - Generalized ticketing engine supporting academic queries, service requests, and official program/department transfers.
-  - Multi-level administrative review, assignment, commenting, and attachment support.
-- **Administrative Control Panel**:
-  - Real-time KPIs (students, staff, active units, hostel occupancy, pending requests).
-  - Triage workflows and user management.
-- **Immutable Audit Logging**:
-  - Comprehensive audit trail of every administrative and security-critical action.
+**This is not yet a usable portal.** The inherited code was audited and several critical issues
+were found; until each feature phase is complete and tested, treat every feature as unfinished.
 
----
+Phase 1 delivered:
 
-## 🚀 Quickstart
+* Design artifacts: `ARCHITECTURE.md` (architecture, directory layout, authentication design,
+  capability catalog + authorization matrix, request state machine, STRIDE threat model, phase plan)
+  and `DATABASE.md` (ERD, constraints, locking order, append-only audit design).
+* Foundation evaluation: `docs/REPOSITORY_EVALUATION.md` (8 open-source projects; none safe to fork).
+* Audit of the inherited code: `docs/AUDIT_EXISTING_CODE.md` (39 findings, each scheduled to a phase).
+* Hardened foundation: Django 5.2 LTS with pinned dependencies; environment-only secrets with
+  fail-fast production settings; trusted-proxy-aware client IP; stock Django admin unmounted;
+  public media serving removed; containment of the critical MFA-enrollment bypass; JSON logging
+  with secret redaction; standalone 500 page; least-privilege PostgreSQL roles; non-root Docker
+  image; secret scanner, ruff, bandit, pip-audit, pre-commit and CI.
+* 54 automated tests (settings safety, deploy checks, headers, CSRF, error pages, client-IP
+  spoofing, admin/media exposure, MFA bypass regression, log redaction, repo hygiene) passing on
+  PostgreSQL 16 and SQLite.
 
-### Prerequisites
-- Python 3.12+ (or 3.14)
-- Git
+## Quick start (development)
 
-### Installation
-1. Clone the repository and navigate into the project directory:
-   ```bash
-   git clone <repo-url>
-   cd "school portal"
-   ```
-2. Create and activate a virtual environment:
-   ```bash
-   py -m venv .venv
-   .venv\Scripts\activate   # Windows
-   # or source .venv/bin/activate on Linux/macOS
-   ```
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-4. Configure environment:
-   ```bash
-   cp .env.example .env
-   ```
-5. Apply database migrations:
-   ```bash
-   python manage.py migrate
-   ```
-6. Populate development seed data:
-   ```bash
-   python manage.py runscript seed_data
-   # or: python scripts/seed_data.py
-   ```
-7. Run the development server:
-   ```bash
-   python manage.py runserver
-   ```
-8. Access the portal at `http://127.0.0.1:8000/`.
+Requirements: Python 3.12+ (3.13 tested), PostgreSQL 16 and Redis 7 (or Docker), git.
 
----
-
-## 🧪 Testing
-
-Run the comprehensive automated test suite (including IDOR, concurrency, and security tests):
 ```bash
-pytest
+python -m venv .venv && source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -r requirements/dev.txt
+cp .env.example .env                                      # then replace every <placeholder>
+python -c "import secrets; print(secrets.token_urlsafe(64))"   # use for DJANGO_SECRET_KEY etc.
 ```
+
+**With Docker (recommended):** `docker compose up --build` — creates the `portal_owner` (migrations)
+and `portal_app` (runtime) database roles, runs migrations as the owner, and serves the dev server on
+<http://127.0.0.1:8000>. Nothing else is published on the host.
+
+**Without Docker:** set `DB_ENGINE=sqlite` in `.env` for a quick look (concurrency tests are skipped on
+SQLite), then `python manage.py migrate && python manage.py runserver`.
+
+Seed data and the `create_portal_superadmin` command arrive in Phases 2–3; until then no accounts exist.
+
+## Common commands
+
+| Task | Command |
+|---|---|
+| Run tests (SQLite) | `pytest` |
+| Run tests (PostgreSQL) | `DB_ENGINE=postgresql DB_USER=… DB_PASSWORD=… pytest` |
+| Lint / security | `ruff check .` · `bandit -q -ll -c pyproject.toml -r apps portal_config` · `pip-audit -r requirements/prod.txt` |
+| Secret scan | `python scripts/secret_scan.py` (also runs in pre-commit and CI) |
+| Production config check | `DJANGO_SETTINGS_MODULE=portal_config.settings.production python manage.py check --deploy` |
+| Install git hooks | `pip install pre-commit && pre-commit install` |
+
+## Documentation
+
+`ARCHITECTURE.md` · `DATABASE.md` · `SECURITY.md` · `API.md` · `DEPLOYMENT.md` ·
+`BACKUP_AND_RESTORE.md` · `TESTING.md` · `SECURITY_TEST_REPORT.md` · `docs/`
+
+## Seed / test accounts
+
+Development seed accounts (Phase 2+) will use obviously fake `@example.test` addresses
+(`admin@example.test`, `student001@example.test`, `staff001@example.test`) with random passwords
+printed once by the seed command. No real personal data is ever committed.

@@ -1,41 +1,26 @@
-# REST API Documentation
+# API
 
-## 1. Authentication & Headers
-All API endpoints require active session authentication or standard Django CSRF headers for mutating methods (`X-CSRFToken`).
-- **Content-Type**: `application/json`
-- **Error Codes**:
-  - `400 Bad Request`: Payload validation error.
-  - `401 Unauthorized`: Unauthenticated session.
-  - `403 Forbidden`: Authenticated user lacks permission (RBAC).
-  - `404 Not Found`: Resource does not exist or user unauthorized to access it (IDOR protection).
-  - `429 Too Many Requests`: Rate limit exceeded.
+Status: **not implemented yet** (planned with the feature phases; design in ARCHITECTURE.md D2).
 
-## 2. Core Endpoints
+The inherited code configured Django REST Framework but exposed no endpoints; no API is reachable today.
 
-### 2.1 Academic Endpoints
-- `GET /api/academics/units/`: List available units with prerequisites and capacity.
-- `POST /api/academics/units/register/`:
-  - Request: `{"unit_code": "CS101"}`
-  - Response: `{"status": "success", "message": "Successfully registered for CS101"}`
-- `POST /api/academics/units/drop/`:
-  - Request: `{"unit_code": "CS101"}`
-  - Response: `{"status": "success", "message": "Successfully dropped CS101"}`
+## Design (binding for implementation)
 
-### 2.2 Hostel Endpoints
-- `GET /api/hostels/available-rooms/`: List hostels and rooms with vacancy.
-- `POST /api/hostels/book-bed/`:
-  - Request: `{"bed_id": "<uuid>"}`
-  - Response: `{"status": "success", "allocation_id": "<uuid>"}`
-  - Note: Employs database row locking to guarantee zero race conditions.
+* Base path `/api/v1/`. JSON only. Session authentication + CSRF header for unsafe methods; **no tokens**
+  (nothing to leak into URLs, logs or browser storage).
+* Every endpoint calls the same selectors/services as the HTML views, so authorization, validation and audit are identical.
+* Serializers declare explicit `fields` allowlists; unknown fields are rejected (400), never silently assigned.
+* Object lookups go through actor-scoped querysets: out-of-scope objects return **404**, in-scope but forbidden actions **403**.
+* Pagination on every list (`page_size` ≤ 100); query parameters validated (length, enum, UUID).
+* Throttles: anonymous 60/h, authenticated 2000/day, plus per-endpoint scopes for search and writes.
+* Errors: `{"detail": "..."}` with no stack traces, SQL or internal class names.
 
-### 2.3 Student Requests & Ticketing
-- `GET /api/requests/my-requests/`: Returns caller's ticket history.
-- `POST /api/requests/create/`:
-  - Request: `{"category_id": "<id>", "subject": "Grade issue", "description": "Details..."}`
-- `POST /api/requests/<id>/messages/`:
-  - Post comments or student responses.
+## Planned endpoints
 
-### 2.4 Notifications & Announcements
-- `GET /api/notifications/`: List unread/read in-app notifications.
-- `POST /api/notifications/<id>/mark-read/`: Mark as acknowledged.
-- `GET /api/announcements/`: List announcements scoped to caller's audience.
+| Method | Path | Who | Phase |
+|---|---|---|---|
+| GET | `/api/v1/me/` | any authenticated user (own data only) | 4 |
+| GET | `/api/v1/me/registrations/` | student | 5 |
+| GET | `/api/v1/me/timetable/` | student, lecturer | 6 |
+| GET | `/api/v1/me/notifications/` · POST `.../{id}/read/` | any (own) | 11 |
+| GET | `/api/v1/offerings/?q=&department=` | any authenticated | 5 |

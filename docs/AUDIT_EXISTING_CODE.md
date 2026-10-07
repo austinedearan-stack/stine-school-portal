@@ -28,7 +28,7 @@ lands (see `ARCHITECTURE.md` §9). ✅ = fixed in Phase 1 with a regression test
 
 | ID | Sev | Finding | Phase |
 |----|-----|---------|-------|
-| A-1 | **C** | **MFA bypass.** After a correct password, an MFA-enrolled admin is put in a "pre-MFA" session and redirected to `/accounts/mfa/verify/`. The attacker can instead browse to `/accounts/mfa/setup/`, which accepts the same pre-MFA session, enrolls a **new** TOTP secret and completes login — bypassing the victim's second factor with only the password. | ✅ 1 (containment + test); full redesign 3 |
+| A-1 | **C** | **MFA bypass.** After a correct password, an MFA-enrolled admin is put in a "pre-MFA" session and redirected to `/accounts/mfa/verify/`. The attacker can instead browse to `/accounts/mfa/setup/`, which accepts the same pre-MFA session, enrolls a **new** TOTP secret and completes login — bypassing the victim's second factor with only the password. | 🟡 1 — bypass for *enrolled* accounts closed + 4 regression tests; first-time enrollment still password-only until one-time enrollment codes (Phase 3) |
 | A-2 | **C** | **Django admin bypasses MFA.** `/django-admin/` uses Django's stock login (password only). Any `is_staff` account reaches it without MFA. | ✅ 1 (admin site disabled unless explicitly enabled; OTP-protected version in 3) |
 | A-3 | H | Hard-coded fallback `SECRET_KEY` in `settings/base.py`; production silently runs with it if the env var is missing. `.env.example` ships `DEBUG=True`. | ✅ 1 |
 | A-4 | H | Password reset is a placeholder — no token is generated or sent. | 3 |
