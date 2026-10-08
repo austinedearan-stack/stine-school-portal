@@ -57,8 +57,20 @@ def test_misconfiguration_is_a_503_naming_the_setting_without_values(py):
     )
     result = py(code, {**ENV, "DATABASE_URL": ""}, VERCEL)
     assert result.returncode == 0, result.stderr
-    assert result.stdout.startswith("503") and "DATABASE_URL" in result.stdout
+    assert result.stdout.startswith("503") and "not configured" in result.stdout and "DATABASE_URL" in result.stdout
     assert STRONG_TEST_KEY not in result.stdout
+
+
+def test_vercel_requirements_match_the_pinned_base_list():
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+
+    def pins(name):
+        return sorted(line.split("#")[0].strip() for line in (root / name).read_text(encoding="utf-8").splitlines()
+                      if line.split("#")[0].strip())
+
+    assert pins("requirements.txt") == pins("requirements/base.txt")
 
 
 def test_vercel_sends_every_request_to_django():
