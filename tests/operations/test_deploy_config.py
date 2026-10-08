@@ -52,6 +52,15 @@ def test_nginx_forwards_exactly_one_client_address():
     assert "zone=portal_auth" in NGINX
 
 
+def test_compose_has_no_unquoted_interpolation_in_flow_lists():
+    """``[${VAR:-x}]`` is invalid YAML: ``{``/``}`` are flow indicators inside ``[...]`` (broke CI once)."""
+    for path in ("docker-compose.prod.yml", "docker-compose.yml"):
+        for number, line in enumerate((ROOT / path).read_text(encoding="utf-8").splitlines(), start=1):
+            for flow in re.findall(r"\[(.*)\]", line.split(" #")[0]):
+                unquoted = re.sub(r'"[^"]*"|\'[^\']*\'', "", flow)
+                assert "${" not in unquoted, f"{path}:{number}: quote ${{...}} inside [...] or use a block list"
+
+
 def test_only_nginx_publishes_ports_and_data_network_is_internal():
     assert COMPOSE.count("ports:") == 1 and "ports:" in _service("nginx")
     assert re.search(r"data: \{internal: true\}", COMPOSE)

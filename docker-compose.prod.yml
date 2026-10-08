@@ -7,7 +7,8 @@ name: school-portal
 x-app: &app
   image: ${PORTAL_IMAGE:-school-portal:latest}
   build: {context: ., target: runtime}
-  env_file: [${PORTAL_ENV_FILE:-/etc/school-portal/portal.env}]
+  env_file:
+    - "${PORTAL_ENV_FILE:-/etc/school-portal/portal.env}"
   restart: unless-stopped
   read_only: true
   tmpfs: [/tmp]
@@ -26,7 +27,8 @@ services:
   db:
     image: postgres:16-alpine
     restart: unless-stopped
-    env_file: [${PORTAL_DB_ENV_FILE:-/etc/school-portal/db.env}]
+    env_file:
+      - "${PORTAL_DB_ENV_FILE:-/etc/school-portal/db.env}"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./deploy/postgres/init:/docker-entrypoint-initdb.d:ro
@@ -43,7 +45,8 @@ services:
     # Rate-limit counters must not be evicted silently: noeviction makes writes fail, and the limiter
     # then fails closed (HTTP 503) instead of forgetting failed sign-ins.
     command: ["sh", "-c", "exec redis-server --requirepass \"$$REDIS_PASSWORD\" --appendonly no --save '' --maxmemory 256mb --maxmemory-policy noeviction"]
-    env_file: [${PORTAL_REDIS_ENV_FILE:-/etc/school-portal/redis.env}]
+    env_file:
+      - "${PORTAL_REDIS_ENV_FILE:-/etc/school-portal/redis.env}"
     read_only: true
     tmpfs: [/data]
     cap_drop: [ALL]
