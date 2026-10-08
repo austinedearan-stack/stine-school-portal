@@ -27,9 +27,14 @@ def _misconfigured(message: str):
     return app
 
 
-try:
-    from django.core.wsgi import get_wsgi_application
+def _build_app():
+    try:
+        from django.core.wsgi import get_wsgi_application
 
-    app = get_wsgi_application()
-except ImproperlyConfigured as exc:
-    app = _misconfigured(str(exc))
+        return get_wsgi_application()
+    except ImproperlyConfigured as exc:
+        return _misconfigured(str(exc))
+
+
+# Plain top-level assignment: Vercel's builder looks for a module-level ``app``.
+app = _build_app()
