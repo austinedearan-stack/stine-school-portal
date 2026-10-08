@@ -49,6 +49,27 @@ def test_refuses_missing_database_plaintext_database_and_weak_key(py):
         assert result.returncode != 0 and message in result.stderr, overrides
 
 
+def test_misconfiguration_is_a_503_naming_the_setting_without_values(py):
+    code = (
+        "from api.index import app; out = [];"
+        "body = b''.join(app({'REQUEST_METHOD': 'GET', 'PATH_INFO': '/'}, lambda s, h: out.append(s)));"
+        "print(out[0]); print(body.decode())"
+    )
+    result = py(code, {**ENV, "DATABASE_URL": ""}, VERCEL)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.startswith("503") and "DATABASE_URL" in result.stdout
+    assert STRONG_TEST_KEY not in result.stdout
+
+
+def test_vercel_publishes_only_the_static_folder():
+    """Without a build step Vercel serves the whole repository (source, docs) as static files."""
+    from pathlib import Path
+
+    config = json.loads((Path(__file__).resolve().parents[2] / "vercel.json").read_text(encoding="utf-8"))
+    assert config["outputDirectory"] == "public"
+    assert config["buildCommand"].endswith("cp -R static public/static")
+
+
 def test_entry_point_serves_static_files_without_collectstatic(py):
     code = (
         "import sys; sys.argv = ['x']; from api.index import app; from django.test import Client;"

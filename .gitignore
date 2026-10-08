@@ -72,3 +72,6 @@ backups/
 
 # Transfer bundles
 *.bundle
+
+# Vercel build output (generated)
+/public/
