@@ -40,9 +40,9 @@ def fetch(base, path, method="GET", data=None, headers=None, cookies=None):
     request = urllib.request.Request(base + path, data=data, method=method, headers=headers or {})  # noqa: S310
     try:
         response = opener(cookies).open(request, timeout=15)  # noqa: S310
-        return response.status, dict(response.headers), response.read()
+        return response.status, response.headers, response.read()  # case-insensitive lookups
     except urllib.error.HTTPError as exc:
-        return exc.code, dict(exc.headers), exc.read()
+        return exc.code, exc.headers, exc.read()
 
 
 def main(base: str) -> int:
