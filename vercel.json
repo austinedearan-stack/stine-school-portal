@@ -1,13 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
-  "buildCommand": "rm -rf public && mkdir -p public && cp -R static public/static",
-  "outputDirectory": "public",
-  "rewrites": [{ "source": "/(.*)", "destination": "/api/index" }],
+  "routes": [{ "src": "/(.*)", "dest": "/api/index" }],
   "functions": {
     "api/index.py": {
       "maxDuration": 30,
-      "excludeFiles": "{tests/**,docs/**,deploy/**,var/**,staticfiles/**,public/**,*.bundle}"
+      "excludeFiles": "{tests/**,docs/**,deploy/**,var/**,staticfiles/**,*.bundle}"
     }
   }
 }

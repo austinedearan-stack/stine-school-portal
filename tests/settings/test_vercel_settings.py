@@ -61,13 +61,18 @@ def test_misconfiguration_is_a_503_naming_the_setting_without_values(py):
     assert STRONG_TEST_KEY not in result.stdout
 
 
-def test_vercel_publishes_only_the_static_folder():
-    """Without a build step Vercel serves the whole repository (source, docs) as static files."""
+def test_vercel_sends_every_request_to_django():
+    """Vercel otherwise serves repository files (source, docs) as static files before any rewrite.
+
+    "routes" run before Vercel's filesystem lookup, so every path reaches Django; WhiteNoise serves
+    /static/. There is no build step and no output directory to publish.
+    """
     from pathlib import Path
 
     config = json.loads((Path(__file__).resolve().parents[2] / "vercel.json").read_text(encoding="utf-8"))
-    assert config["outputDirectory"] == "public"
-    assert config["buildCommand"].endswith("cp -R static public/static")
+    assert config["routes"] == [{"src": "/(.*)", "dest": "/api/index"}]
+    assert not {"rewrites", "buildCommand", "outputDirectory"} & set(config)
+    assert not any(route.get("handle") == "filesystem" for route in config["routes"])
 
 
 def test_entry_point_serves_static_files_without_collectstatic(py):
