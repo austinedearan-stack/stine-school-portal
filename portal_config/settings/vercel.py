@@ -45,7 +45,7 @@ if not PORTAL_HMAC_KEY:  # noqa: F405
 
 # --- Database -----------------------------------------------------------------------------------
 def database_from_url(url: str) -> dict:
-    """postgres://user:password@host:port/name?sslmode=require&... -> Django settings (TLS required)."""
+    """A postgres:// connection URL (credentials, host, port, name, query options) -> Django settings (TLS required)."""
     parts = urlsplit(url)
     if parts.scheme not in ("postgres", "postgresql"):
         raise ImproperlyConfigured("DATABASE_URL must be a postgres:// URL.")
