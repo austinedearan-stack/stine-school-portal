@@ -15,7 +15,6 @@ from datetime import timedelta
 from io import StringIO
 
 from django.core.management import call_command
-from django.db import close_old_connections
 from django.utils import timezone
 
 from apps.core.models import MaintenanceRun
@@ -81,7 +80,6 @@ def run_job(job: Job) -> MaintenanceRun:
     summary = output.getvalue().strip()
     if len(summary) > SUMMARY_LIMIT:
         summary = summary[:SUMMARY_LIMIT] + "\n[truncated]"
-    close_old_connections()
     run = MaintenanceRun.objects.create(job=job.name, started_at=started, finished_at=timezone.now(), ok=ok,
                                         summary=summary)
     logger.info("job_finished", extra={"job": job.name, "ok": ok,

@@ -152,6 +152,28 @@ Markers: `postgres` (requires PostgreSQL — skipped on SQLite), `slow`.
 * CI `deploy-config` job: `docker compose -f docker-compose.prod.yml config`, `nginx -t` on the rendered template with a
   throw-away certificate, shellcheck of the deploy scripts.
 
+## PostgreSQL verification (2026-10-08)
+
+First run of the whole suite against a real PostgreSQL server (18.6, local). Result after fixes: **718 passed, 4 skipped**
+(the skips are SQLite-specific checks with PostgreSQL equivalents); SQLite: 712 passed, 10 skipped.
+
+Defects found that SQLite could not reveal, all fixed with the run above as regression evidence:
+
+* **`core.0002_append_only_guards` could not be applied on PostgreSQL.** The PL/pgSQL trigger function contains `%`
+  (in `RAISE EXCEPTION 'table % …'`) and was executed with an empty parameter tuple, so psycopg parsed `%` as a
+  placeholder. Literal SQL blocks in `apps/core/db_guards.py` are now executed with `params=None`. Verified on PG 18:
+  all migrations apply; a client-chosen `seq` is replaced by the server's; UPDATE/DELETE/TRUNCATE on the audit log are
+  refused; the owner-only maintenance escape works.
+* **Scheduled jobs closed the database connection mid-transaction** (`close_old_connections()` inside `run_job`). It now
+  only runs between scheduler passes.
+* **Test-order dependency:** transactional tests flush every table, including rows seeded by data migrations
+  (capability groups, request categories), so later tests failed. An autouse fixture in `tests/conftest.py` re-seeds
+  them when missing.
+* Backup tests are transactional on PostgreSQL (`pg_dump` runs in its own session and sees committed data only).
+
+End-to-end: `backup_portal` then `restore_test` against the `school_portal` database: OK (59 tables, checksums,
+migrations, seal chains, uploads).
+
 ## Required categories (spec §35) — where each is tested
 
 | Category | Suites |

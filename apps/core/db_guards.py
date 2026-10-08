@@ -51,7 +51,7 @@ def _install(table: str):
         q = conn.ops.quote_name
         if conn.vendor == "postgresql":
             seq_name = f"{table}_seq_seq"
-            schema_editor.execute(_PG_FUNCTIONS)
+            schema_editor.execute(_PG_FUNCTIONS, params=None)  # literal SQL: its % are PL/pgSQL, not placeholders
             schema_editor.execute(f"CREATE SEQUENCE IF NOT EXISTS {q(seq_name)} AS bigint")
             schema_editor.execute(
                 f"CREATE TRIGGER {q(table + '_assign_seq')} BEFORE INSERT ON {q(table)} "
@@ -102,10 +102,10 @@ def postgres_only_sql(sql: str, reverse_sql: str) -> migrations.RunPython:
 
     def forwards(apps, schema_editor):
         if schema_editor.connection.vendor == "postgresql":
-            schema_editor.execute(sql)
+            schema_editor.execute(sql, params=None)  # literal SQL, no placeholders
 
     def backwards(apps, schema_editor):
         if schema_editor.connection.vendor == "postgresql":
-            schema_editor.execute(reverse_sql)
+            schema_editor.execute(reverse_sql, params=None)
 
     return migrations.RunPython(forwards, backwards)

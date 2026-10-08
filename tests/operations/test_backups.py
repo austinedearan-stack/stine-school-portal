@@ -15,6 +15,7 @@ from pathlib import Path
 from unittest import mock
 
 import pytest
+from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import CommandError, call_command
 from django.utils import timezone
@@ -26,9 +27,10 @@ from apps.core.models import FilePurpose
 from apps.core.seals import seal_all
 from tests import factories as f
 
-# SQLite: the backup API reads through the test connection, so the normal test transaction suffices.
-# PostgreSQL: pg_dump is a separate session and only sees committed data -> transactional test.
-pytestmark = pytest.mark.django_db
+# SQLite: the dump reads through the test connection, so the normal test transaction suffices.
+# PostgreSQL: pg_dump is a separate session and only sees committed data, so tests must commit.
+POSTGRES = settings.DATABASES["default"]["ENGINE"].endswith("postgresql")
+pytestmark = pytest.mark.django_db(transaction=POSTGRES)
 
 
 @pytest.fixture

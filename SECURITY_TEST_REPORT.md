@@ -74,7 +74,7 @@ Accepted residual risks (documented, not fixed):
 * Student and staff IDs and email addresses have separate throttle budgets (by design, so throttling is not a
   linking oracle; ARCHITECTURE.md §4.1).
 * Audit records keep the before/after values of contact fields; readable only with `view_audit_logs`.
-* Race and trigger tests run on PostgreSQL in CI only; they were not executed in this environment.
+* Race and trigger tests run on PostgreSQL (CI, and locally on PostgreSQL 18 on 2026-10-08: all passed).
 
 ## Phase 15 — deployment preparation (2026-10-08)
 
@@ -89,8 +89,9 @@ Accepted residual risks (documented, not fixed):
 | P15-07 | Deployment misconfiguration | Static checks of Nginx/compose/Gunicorn/Dockerfile (16 tests) + `nginx -t` and `docker compose config` in CI | Only Nginx publishes ports; data network internal; containers read-only with capabilities dropped; body limit equals `MAX_REQUEST_BYTES`; X-Accel location internal; no secrets in compose |
 | P15-08 | Scheduler stops silently | Operations page flags jobs without success for 2× their interval; failures retried after 1 h | Tested (`tests/operations/test_jobs.py`) |
 
-Not verified in this environment: a real deployment on a Linux host, `pg_dump`/`pg_restore` against PostgreSQL
-(runs in CI), and `nginx -t` (runs in CI). Run `scripts/security_probe.py` against staging before go-live.
+Verified locally on PostgreSQL 18 (2026-10-08): the `pg_dump`/`pg_restore` round trip and an end-to-end
+`backup_portal` + `restore_test` run. Not yet verified: a real deployment on a Linux host and `nginx -t` (runs in CI).
+Run `scripts/security_probe.py` against staging before go-live.
 
 ## Known open issues (not yet fixed)
 

@@ -50,3 +50,33 @@ def pytest_collection_modifyitems(config, items):
     for item in items:
         if "postgres" in item.keywords:
             item.add_marker(skip)
+
+
+@pytest.fixture(autouse=True)
+def _reference_data(request, _django_db_marker):
+    """Restore rows created by data migrations (capability groups, request categories).
+
+    A transactional test ends by flushing every table, which also deletes these rows; any later test
+    (or the next run with --reuse-db) would then see an empty catalogue. Re-seeding only when missing
+    keeps results independent of test order at the cost of two existence queries.
+    """
+    if request.node.get_closest_marker("django_db") is None and not {"db", "transactional_db"} & set(
+        request.fixturenames
+    ):
+        return
+    request.getfixturevalue("_django_db_helper")
+    import importlib
+
+    from django.apps import apps
+    from django.contrib.auth.models import Group, Permission
+    from django.contrib.contenttypes.models import ContentType
+
+    from apps.core.capabilities import sync_capability_groups
+    from apps.student_requests.models import RequestCategory
+
+    if not Group.objects.exists():
+        sync_capability_groups(Group, Permission, ContentType)
+    if not RequestCategory.objects.exists():
+        importlib.import_module("apps.student_requests.migrations.0002_history_guard_and_categories").seed_categories(
+            apps, None
+        )
