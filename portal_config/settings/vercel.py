@@ -73,7 +73,7 @@ DATABASES = with_audit_alias(database_from_url(_url))
 
 # --- Cache, files, mail ---------------------------------------------------------------------------
 CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "portal-vercel"}}
-MEDIA_ROOT = Path("/tmp/private-media")  # noqa: S108 - the only writable path on Vercel; ephemeral by design
+MEDIA_ROOT = Path("/tmp/private-media")  # noqa: S108 # nosec B108 - only writable path on Vercel; ephemeral
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 # Static files are served by WhiteNoise straight from the source directories (no collectstatic step).
 WHITENOISE_USE_FINDERS = True
