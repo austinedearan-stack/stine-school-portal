@@ -23,7 +23,7 @@ from django.core.exceptions import ImproperlyConfigured
 
 from .base import *  # noqa: F403
 from .base import SECRET_KEY, with_audit_alias
-from .env import env_list, env_str
+from .env import env_list
 
 DEBUG = False
 
@@ -66,9 +66,24 @@ def database_from_url(url: str) -> dict:
     }
 
 
-_url = env_str("DATABASE_URL_UNPOOLED") or env_str("POSTGRES_URL_NON_POOLING") or env_str("DATABASE_URL")
+def find_database_url(environ) -> str:
+    """The first URL found, direct (unpooled) connections first.
+
+    Vercel's Neon integration may prefix its variables (e.g. ``STORAGE_DATABASE_URL``), so names are
+    matched by suffix as well as exactly.
+    """
+    for suffix in ("DATABASE_URL_UNPOOLED", "POSTGRES_URL_NON_POOLING", "DATABASE_URL", "POSTGRES_URL"):
+        for name in sorted(environ):
+            if (name == suffix or name.endswith("_" + suffix)) and environ[name].strip():
+                return environ[name].strip()
+    return ""
+
+
+_url = find_database_url(os.environ)
 if not _url:
-    raise ImproperlyConfigured("Set DATABASE_URL (managed PostgreSQL) for the Vercel test deployment.")
+    raise ImproperlyConfigured(
+        "Set DATABASE_URL (managed PostgreSQL, e.g. Vercel Storage -> Neon) for the Vercel test deployment."
+    )
 DATABASES = with_audit_alias(database_from_url(_url))
 
 # --- Cache, files, mail ---------------------------------------------------------------------------

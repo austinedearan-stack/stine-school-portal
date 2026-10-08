@@ -32,6 +32,14 @@ def test_loads_with_vercel_hosts_tls_database_and_secure_cookies(py):
     assert cfg["MEDIA"].replace("\\", "/").endswith("/tmp/private-media")
 
 
+def test_prefixed_neon_variables_are_found(py):
+    env = {**ENV, "DATABASE_URL": "", "STORAGE_DATABASE_URL": URL,
+           "STORAGE_DATABASE_URL_UNPOOLED": URL.replace("db.example.test:6543", "direct.example.test:5432")}
+    result = py(DUMP, env, VERCEL)
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["DB"][2] == "direct.example.test"
+
+
 def test_unpooled_url_is_preferred(py):
     env = {**ENV, "DATABASE_URL_UNPOOLED": URL.replace("db.example.test:6543", "direct.example.test:5432")}
     cfg = json.loads(py(DUMP, env, VERCEL).stdout)
