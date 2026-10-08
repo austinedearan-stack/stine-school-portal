@@ -4,7 +4,7 @@ permissions:
   contents: read
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:16
@@ -22,9 +22,9 @@ jobs:
       DB_PASSWORD: ci-only-not-a-secret  # secret-scan: allow
       DB_HOST: localhost
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with: {fetch-depth: 0}
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with: {python-version: "3.13"}
       - run: pip install -r requirements/dev.txt
       - name: Secret scan
@@ -60,9 +60,9 @@ jobs:
           python manage.py check --deploy --fail-level WARNING
 
   deploy-config:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Production compose file is valid
         run: |
           mkdir -p ci-env
@@ -71,15 +71,30 @@ jobs:
             PORTAL_ENV_FILE="$PWD/ci-env/portal.env" PORTAL_OWNER_ENV_FILE="$PWD/ci-env/owner.env" \
             PORTAL_BACKUP_ENV_FILE="$PWD/ci-env/backup.env" PORTAL_DB_ENV_FILE="$PWD/ci-env/db.env" \
             PORTAL_REDIS_ENV_FILE="$PWD/ci-env/redis.env"
-          docker compose -f docker-compose.prod.yml config -q
+          report() {  # $1 = title; stdin = tool output -> one ::error annotation
+            out=$(cat); out=${out//'%'/'%25'}; out=${out//$'\r'/}; out=${out//$'\n'/'%0A'}
+            echo "::error title=$1::$out"
+          }
+          docker compose -f docker-compose.prod.yml config -q > compose.log 2>&1 \
+            || { report "docker compose config" < compose.log; exit 1; }
       - name: Nginx configuration test
         run: |
           mkdir -p tls
           openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj "/CN=portal.example.test" \
             -keyout tls/privkey.pem -out tls/fullchain.pem
+          report() {  # $1 = title; stdin = tool output -> one ::error annotation
+            out=$(cat); out=${out//'%'/'%25'}; out=${out//$'\r'/}; out=${out//$'\n'/'%0A'}
+            echo "::error title=$1::$out"
+          }
           docker run --rm --add-host web:127.0.0.1 \
             -e PORTAL_HOST=portal.example.test -e NGINX_ENVSUBST_FILTER='^PORTAL_' \
             -v "$PWD/deploy/nginx/templates:/etc/nginx/templates:ro" -v "$PWD/tls:/etc/nginx/tls:ro" \
-            nginx:1.28-alpine nginx -t
+            nginx:1.28-alpine nginx -t > nginx.log 2>&1 || { report "nginx -t" < nginx.log; exit 1; }
       - name: Shell scripts
-        run: shellcheck deploy/postgres/init/01-roles.sh deploy/scripts/offsite_copy.sh
+        run: |
+          report() {  # $1 = title; stdin = tool output -> one ::error annotation
+            out=$(cat); out=${out//'%'/'%25'}; out=${out//$'\r'/}; out=${out//$'\n'/'%0A'}
+            echo "::error title=$1::$out"
+          }
+          shellcheck deploy/postgres/init/01-roles.sh deploy/scripts/offsite_copy.sh > shellcheck.log 2>&1 \
+            || { report "shellcheck" < shellcheck.log; exit 1; }
