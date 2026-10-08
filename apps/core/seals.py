@@ -72,16 +72,16 @@ def seal_stream(stream: str, *, now=None) -> AuditSeal | None:
     return seal
 
 
-def verify_stream(stream: str) -> list[str]:
+def verify_stream(stream: str, *, using: str = "default") -> list[str]:
     model, _ = _streams()[stream]
     problems = []
     previous_hash, previous_to = "", 0
-    for seal in AuditSeal.objects.filter(stream=stream).order_by("from_seq"):
+    for seal in AuditSeal.objects.using(using).filter(stream=stream).order_by("from_seq"):
         if seal.previous_sha256 != previous_hash:
             problems.append(f"{stream}: seal {seal.from_seq}-{seal.to_seq} does not chain to the previous seal")
         if seal.from_seq <= previous_to:
             problems.append(f"{stream}: seal {seal.from_seq}-{seal.to_seq} overlaps the previous seal")
-        rows = list(model.objects.filter(seq__gte=seal.from_seq, seq__lte=seal.to_seq).order_by("seq"))
+        rows = list(model.objects.using(using).filter(seq__gte=seal.from_seq, seq__lte=seal.to_seq).order_by("seq"))
         if len(rows) != seal.row_count:
             problems.append(f"{stream}: seal {seal.from_seq}-{seal.to_seq} expected {seal.row_count} rows, "
                             f"found {len(rows)} (rows deleted or inserted)")
@@ -95,8 +95,17 @@ def seal_all(now=None) -> list[AuditSeal]:
     return [s for s in (seal_stream(stream, now=now) for stream in _streams()) if s is not None]
 
 
-def verify_all() -> list[str]:
+def verify_all(*, using: str = "default") -> list[str]:
     problems = []
     for stream in _streams():
-        problems.extend(verify_stream(stream))
+        problems.extend(verify_stream(stream, using=using))
     return problems
+
+
+def seal_heads(*, using: str = "default") -> dict[str, list]:
+    """Latest seal of each stream as ``[to_seq, sha256]`` (recorded in backup manifests)."""
+    heads = {}
+    for stream in _streams():
+        last = AuditSeal.objects.using(using).filter(stream=stream).order_by("-to_seq").first()
+        heads[stream] = [last.to_seq, last.sha256] if last else [0, ""]
+    return heads

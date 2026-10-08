@@ -1,0 +1,129 @@
+# Production stack (DEPLOYMENT.md). Usage:
+#   docker compose -f docker-compose.prod.yml --env-file /etc/school-portal/compose.env up -d
+# Secrets live in /etc/school-portal/*.env (root-owned, mode 600), never in the repository.
+# Only Nginx publishes ports. PostgreSQL and Redis sit on an internal network with no route out.
+name: school-portal
+
+x-app: &app
+  image: ${PORTAL_IMAGE:-school-portal:latest}
+  build: {context: ., target: runtime}
+  env_file: [${PORTAL_ENV_FILE:-/etc/school-portal/portal.env}]
+  restart: unless-stopped
+  read_only: true
+  tmpfs: [/tmp]
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  environment: &app-env
+    DJANGO_SETTINGS_MODULE: portal_config.settings.production
+    DB_HOST: db
+    DB_SSLMODE: disable                 # compose-internal network only (see DB_ALLOW_INSECURE_TRANSPORT)
+    DB_ALLOW_INSECURE_TRANSPORT: "true"
+    TRUSTED_PROXY_COUNT: "1"            # exactly one proxy (nginx) in front
+    PRIVATE_MEDIA_ROOT: /app/var/private-media
+    PRIVATE_FILES_X_ACCEL_PREFIX: /_protected/
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file: [${PORTAL_DB_ENV_FILE:-/etc/school-portal/db.env}]
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./deploy/postgres/init:/docker-entrypoint-initdb.d:ro
+    shm_size: 256mb
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 20
+    networks: [data]
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # Rate-limit counters must not be evicted silently: noeviction makes writes fail, and the limiter
+    # then fails closed (HTTP 503) instead of forgetting failed sign-ins.
+    command: ["sh", "-c", "exec redis-server --requirepass \"$$REDIS_PASSWORD\" --appendonly no --save '' --maxmemory 256mb --maxmemory-policy noeviction"]
+    env_file: [${PORTAL_REDIS_ENV_FILE:-/etc/school-portal/redis.env}]
+    read_only: true
+    tmpfs: [/data]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    networks: [data]
+
+  migrate:
+    <<: *app
+    restart: "no"
+    command: ["sh", "-c", "python manage.py migrate --noinput && python manage.py sync_capabilities"]
+    # Migrations run as the schema owner (DB_USER/DB_PASSWORD overridden by owner.env); the web
+    # process never holds these credentials.
+    env_file:
+      - ${PORTAL_ENV_FILE:-/etc/school-portal/portal.env}
+      - ${PORTAL_OWNER_ENV_FILE:-/etc/school-portal/owner.env}
+    depends_on:
+      db: {condition: service_healthy}
+    networks: [data]
+
+  web:
+    <<: *app
+    volumes:
+      - private_media:/app/var/private-media
+    expose: ["8000"]
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_started}
+      migrate: {condition: service_completed_successfully}
+    networks: [edge, data, egress]
+
+  scheduler:
+    <<: *app
+    command: ["python", "manage.py", "run_jobs", "--group", "maintenance"]
+    healthcheck: {disable: true}
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    networks: [data, egress]
+
+  backup:
+    <<: *app
+    image: ${PORTAL_OPS_IMAGE:-school-portal-ops:latest}
+    build: {context: ., target: ops}
+    command: ["python", "manage.py", "run_jobs", "--group", "backup"]
+    env_file:
+      - ${PORTAL_ENV_FILE:-/etc/school-portal/portal.env}
+      - ${PORTAL_BACKUP_ENV_FILE:-/etc/school-portal/backup.env}   # BACKUP_DB_*, RESTORE_DB_*
+    environment:
+      <<: *app-env
+      BACKUP_DIR: /backups
+    volumes:
+      - private_media:/app/var/private-media:ro
+      - backups:/backups
+    healthcheck: {disable: true}
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    networks: [data]
+
+  nginx:
+    image: nginx:1.28-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      PORTAL_HOST: ${PORTAL_HOST:?set PORTAL_HOST}
+      NGINX_ENVSUBST_FILTER: "^PORTAL_"
+    volumes:
+      - ./deploy/nginx/templates:/etc/nginx/templates:ro
+      - ${PORTAL_TLS_DIR:-/etc/school-portal/tls}:/etc/nginx/tls:ro
+      - ${PORTAL_ACME_DIR:-/var/www/acme}:/var/www/acme:ro
+      - private_media:/srv/private-media:ro
+    read_only: true
+    tmpfs: [/etc/nginx/conf.d, /var/cache/nginx, /var/run, /tmp]
+    depends_on: [web]
+    networks: [edge]
+
+networks:
+  edge: {}
+  data: {internal: true}   # no route to the internet
+  egress: {}               # outbound SMTP for mail
+
+volumes:
+  postgres_data:
+  private_media:
+  backups:

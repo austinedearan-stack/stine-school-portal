@@ -3,6 +3,8 @@
 # Creates least-privilege roles (spec §27, ARCHITECTURE D14):
 #   portal_owner - owns the database/schema; used ONLY to run migrations
 #   portal_app   - runtime role used by the web app: DML only, no DDL, not superuser, not owner
+#   portal_restore (optional, DB_RESTORE_USER) - CREATEDB only; the weekly restore test creates and drops
+#                  its own scratch database <DB_NAME>_restore_test and has no rights on the live database
 # Audit tables additionally lose UPDATE/DELETE for portal_app in the Phase 2 migration.
 set -eu
 
@@ -38,3 +40,11 @@ ALTER DEFAULT PRIVILEGES FOR ROLE :"owner" IN SCHEMA public
 ALTER ROLE :"app" SET statement_timeout = '30s';
 ALTER ROLE :"app" SET idle_in_transaction_session_timeout = '5min';
 SQL
+
+if [ -n "${DB_RESTORE_USER:-}" ]; then
+  : "${DB_RESTORE_PASSWORD:?DB_RESTORE_PASSWORD required when DB_RESTORE_USER is set}"
+  psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname postgres \
+    -v restore="$DB_RESTORE_USER" -v restore_pw="$DB_RESTORE_PASSWORD" <<'SQL'
+CREATE ROLE :"restore" LOGIN PASSWORD :'restore_pw' NOSUPERUSER CREATEDB NOCREATEROLE NOREPLICATION;
+SQL
+fi

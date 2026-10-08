@@ -206,6 +206,24 @@ class ScanStatus(models.TextChoices):
     INFECTED = "INFECTED", "Infected"
 
 
+class MaintenanceRun(models.Model):
+    """One execution of a scheduled job, backup or restore test (ops page for SUPERADMINs, DEPLOYMENT.md)."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    job = models.CharField(max_length=64)
+    started_at = models.DateTimeField()
+    finished_at = models.DateTimeField()
+    ok = models.BooleanField()
+    summary = models.TextField(blank=True)  # command output, truncated; never contains secrets
+
+    class Meta:
+        ordering = ["-started_at"]
+        indexes = [models.Index(fields=["job", "-started_at"], name="maintenancerun_job_started")]
+
+    def __str__(self):
+        return f"{self.job} {'ok' if self.ok else 'FAILED'} at {self.started_at:%Y-%m-%d %H:%M}"
+
+
 class StoredFile(models.Model):
     """A private uploaded file. Stored under a random server-generated name outside any web root."""
 

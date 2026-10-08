@@ -23,4 +23,5 @@ urlpatterns = [
     path("setup/semesters/<uuid:semester_id>/current/", views.set_current_semester_view, name="semester_current"),
     path("audit-log/", views.audit_log_view, name="audit_log"),
     path("security-events/", views.security_events_view, name="security_events"),
+    path("operations/", views.operations_view, name="operations"),
 ]

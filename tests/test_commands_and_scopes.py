@@ -5,7 +5,7 @@ from unittest import mock
 
 import pytest
 from django.core import mail
-from django.core.management import call_command
+from django.core.management import CommandError, call_command
 from django.utils import timezone
 
 from apps.accounts import mfa
@@ -62,9 +62,8 @@ def test_seal_and_verify_commands(capsys):
 
 def test_verify_command_exits_non_zero_on_tampering():
     with mock.patch("apps.core.management.commands.verify_audit_seals.verify_all", return_value=["AUDIT: broken"]):
-        with pytest.raises(SystemExit) as exit_info:
+        with pytest.raises(CommandError, match="1 audit seal problem"):
             call_command("verify_audit_seals")
-    assert exit_info.value.code == 1
 
 
 def test_outbox_failure_is_recorded_and_retried(settings):

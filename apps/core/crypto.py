@@ -5,6 +5,8 @@
 * ``keyed_digest``: HMAC-SHA256 with ``settings.PORTAL_HMAC_KEY`` and a purpose label. Used for
   recovery/enrollment/reset codes, device-cookie nonces and identifier hashes: one indexed lookup,
   no per-row password hashing (so no N x Argon2 DoS), useless to an attacker without the key.
+  ``keyed_digests`` adds digests under ``PORTAL_HMAC_KEY_FALLBACKS`` so stored codes survive a key
+  rotation (lookups use ``__in``); new values are always written with the current key.
 """
 
 from __future__ import annotations
@@ -49,6 +51,15 @@ def keyed_digest(value: str, *, purpose: str) -> str:
         raise ImproperlyConfigured("PORTAL_HMAC_KEY is not set.")
     message = f"{purpose}\x00{value}".encode()
     return hmac.new(key.encode(), message, hashlib.sha256).hexdigest()
+
+
+def keyed_digests(value: str, *, purpose: str) -> list[str]:
+    """Digest under the current key first, then under each fallback key (for lookups during rotation)."""
+    digests = [keyed_digest(value, purpose=purpose)]
+    message = f"{purpose}\x00{value}".encode()
+    for key in getattr(settings, "PORTAL_HMAC_KEY_FALLBACKS", []):
+        digests.append(hmac.new(key.encode(), message, hashlib.sha256).hexdigest())
+    return digests
 
 
 def random_code(length: int) -> str:

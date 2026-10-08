@@ -53,6 +53,8 @@ NAV_ITEMS = [
     NavItem("Audit log", "administration:audit_log", "Administration", any_capability=("view_audit_logs",)),
     NavItem("Security events", "administration:security_events", "Administration",
             any_capability=("view_audit_logs",)),
+    NavItem("Operations & backups", "administration:operations", "Administration",
+            any_capability=("manage_backups",)),
 ]
 
 

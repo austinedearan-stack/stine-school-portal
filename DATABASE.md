@@ -263,6 +263,10 @@ lets analysts correlate attempts without storing what was typed); `ip_address`; 
    breaks the seal chain, which `manage.py verify_audit_seals` detects. (Periodic seals avoid serialising every audited write.)
 Retention/archival, if ever required, is a documented DBA procedure under the owner role, outside the application.
 
+**MaintenanceRun** (Phase 15) — id; `job` (≤64); `started_at`; `finished_at`; `ok`; `summary` (command output, ≤4000 chars,
+never data values). IX(job, −started_at). One row per scheduled job, backup or restore test; shown on the Operations page.
+Not append-only (operational telemetry, not evidence); the audit trail of security-relevant actions stays in AuditLog.
+
 ## 3. Transactions & locking
 
 | Operation | Locks (in order, to avoid deadlocks) | DB backstop |

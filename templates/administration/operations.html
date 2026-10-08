@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Operations & backups{% endblock %}
+{% block content %}
+<div class="page-header"><div><h1>Operations &amp; backups</h1><p>Scheduled jobs, nightly backups and the weekly restore test. A job is <strong>overdue</strong> when it has not succeeded for twice its interval. Backups cannot be downloaded from the portal.</p></div></div>
+<div class="card">
+  <h2>Schedule</h2>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Job</th><th>Group</th><th>Every</th><th>Last run</th><th>Result</th><th>Last success</th><th>State</th></tr></thead>
+    <tbody>{% for row in status %}<tr>
+      <td><a href="?job={{ row.job.name|urlencode }}">{{ row.job.name }}</a></td>
+      <td>{{ row.job.group }}</td>
+      <td class="small">{{ row.job.every }}</td>
+      <td class="small">{% if row.last %}{{ row.last.started_at|date:"Y-m-d H:i" }}{% else %}never{% endif %}</td>
+      <td>{% if row.last %}{% if row.last.ok %}<span class="badge badge-ok">ok</span>{% else %}<span class="badge badge-err">failed</span>{% endif %}{% else %}–{% endif %}</td>
+      <td class="small">{% if row.last_ok %}{{ row.last_ok.started_at|date:"Y-m-d H:i" }}{% else %}never{% endif %}</td>
+      <td>{% if row.overdue %}<span class="badge badge-warn">overdue</span>{% else %}<span class="badge badge-ok">on schedule</span>{% endif %}</td>
+    </tr>{% endfor %}</tbody>
+  </table></div>
+</div>
+<div class="card">
+  <h2>Run history{% if job %}: {{ job }} <a class="small" href="?">(all jobs)</a>{% endif %}</h2>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Started</th><th>Job</th><th>Result</th><th>Output</th></tr></thead>
+    <tbody>{% for run in page.object_list %}<tr>
+      <td class="small">{{ run.started_at|date:"Y-m-d H:i:s" }}</td>
+      <td>{{ run.job }}</td>
+      <td>{% if run.ok %}<span class="badge badge-ok">ok</span>{% else %}<span class="badge badge-err">failed</span>{% endif %}</td>
+      <td class="small prewrap mono">{{ run.summary|truncatechars:600 }}</td>
+    </tr>{% empty %}<tr><td colspan="4" class="empty">No runs recorded yet.</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% include "partials/pagination.html" %}
+</div>
+{% endblock %}

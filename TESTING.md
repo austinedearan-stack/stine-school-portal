@@ -144,6 +144,14 @@ Markers: `postgres` (requires PostgreSQL — skipped on SQLite), `slow`.
 * `python scripts/security_probe.py <base-url>`: black-box checks for a running server (exit 1 on failure). Against the
   local development server: 25/26 (the development server's `Server` header; production hides it in Nginx).
 
+## Phase 15 results (2026-10-08)
+
+* Added `tests/operations/` (backups and restore test 12, scheduled jobs and Operations page 7, deployment configuration 16)
+  and `tests/auth/test_hmac_rotation.py` (10). Full suite: 712 passed, 10 skipped (PostgreSQL-only, incl. the
+  `pg_dump`/`pg_restore` round trip, which runs in CI with the PostgreSQL 16 client).
+* CI `deploy-config` job: `docker compose -f docker-compose.prod.yml config`, `nginx -t` on the rendered template with a
+  throw-away certificate, shellcheck of the deploy scripts.
+
 ## Required categories (spec §35) — where each is tested
 
 | Category | Suites |

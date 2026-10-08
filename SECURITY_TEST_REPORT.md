@@ -62,7 +62,7 @@ DEBUG off. Earlier phases' attack tests (P1–P3 above, feature suites, Phase 13
 | P14-09 | Self-escalation | Superadmin/admin changes own groups; open redirect via re-authentication `next` | Refused | Refused | — | `test_superadmin_cannot_change_own_groups_…`, `test_open_redirect_through_reauthentication_next_is_refused` |
 | P14-10 | Enrollment-code brute force | Guess codes after a stolen password | Pre-auth discarded after 5 tries | As expected | — | `test_enrollment_code_guessing_is_cut_off` |
 | P14-11 | Script in upload filename | `"><script>….png` | Sanitised name, escaped output | As expected | — | `test_script_in_attachment_filename_is_neutralised` |
-| P14-12 | Version disclosure | Inspect `Server` header | No version | Development server reports `WSGIServer/0.2 CPython/…` | Production: Nginx `server_tokens off` and hides the upstream header (Phase 15) | probe check "no Server version leak" |
+| P14-12 | Version disclosure | Inspect `Server` header | No version | Development server reports `WSGIServer/0.2 CPython/…` | Fixed in Phase 15: Nginx `server_tokens off` and does not pass the upstream `Server` header | probe check "no Server version leak"; `tests/operations/test_deploy_config.py` |
 
 Black-box probe result (DEBUG off, static via WhiteNoise): 25/26 checks pass; the remaining one is P14-12 (development
 server only). Headers, CSRF on the login form, generic failures, throttling (429 after 5 failures), API refusal,
@@ -75,6 +75,22 @@ Accepted residual risks (documented, not fixed):
   linking oracle; ARCHITECTURE.md §4.1).
 * Audit records keep the before/after values of contact fields; readable only with `view_audit_logs`.
 * Race and trigger tests run on PostgreSQL in CI only; they were not executed in this environment.
+
+## Phase 15 — deployment preparation (2026-10-08)
+
+| # | Risk | Test | Result |
+|---|---|---|---|
+| P15-01 | Backup silently unusable | Weekly `restore_test`: checksums, restore into scratch DB, row counts, migrations, seal chains, uploads | Round trip passes (SQLite locally; PostgreSQL in CI) |
+| P15-02 | Corrupted / tampered backup accepted | Append bytes to the archive; edit counts; remove an upload; alter an audit row in the dump (and fix up its checksum) | All four rejected; the altered audit row is caught by the seal chain |
+| P15-03 | Path traversal from a malicious media archive during restore | Archive member `../../escape.txt` | Extraction refused (`data` filter); nothing written outside the target |
+| P15-04 | Restore test pointed at the live database | `RESTORE_SCRATCH_DB` equal to / not ending in `_restore_test` | Refused before any SQL runs |
+| P15-05 | Interrupted backup taken as "latest" | Failure during archiving | `.partial` directory removed; latest backup unchanged |
+| P15-06 | Lock-out after key rotation | Codes, recovery codes, enrollment codes and device cookies issued under the old HMAC key, with and without the fallback | Accepted only while the old key is listed in `PORTAL_HMAC_KEY_FALLBACKS`; new values always use the current key; weak fallback keys refused at start-up |
+| P15-07 | Deployment misconfiguration | Static checks of Nginx/compose/Gunicorn/Dockerfile (16 tests) + `nginx -t` and `docker compose config` in CI | Only Nginx publishes ports; data network internal; containers read-only with capabilities dropped; body limit equals `MAX_REQUEST_BYTES`; X-Accel location internal; no secrets in compose |
+| P15-08 | Scheduler stops silently | Operations page flags jobs without success for 2× their interval; failures retried after 1 h | Tested (`tests/operations/test_jobs.py`) |
+
+Not verified in this environment: a real deployment on a Linux host, `pg_dump`/`pg_restore` against PostgreSQL
+(runs in CI), and `nginx -t` (runs in CI). Run `scripts/security_probe.py` against staging before go-live.
 
 ## Known open issues (not yet fixed)
 

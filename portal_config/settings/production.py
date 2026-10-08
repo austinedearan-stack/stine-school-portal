@@ -13,6 +13,7 @@ from .base import (
     DJANGO_ADMIN_ENABLED,
     MFA_ENCRYPTION_KEYS,
     PORTAL_HMAC_KEY,
+    PORTAL_HMAC_KEY_FALLBACKS,
     SECRET_KEY,
     TRUSTED_PROXY_COUNT,
     database_from_env,
@@ -43,6 +44,8 @@ if not PORTAL_HMAC_KEY or len(PORTAL_HMAC_KEY) < 32 or PORTAL_HMAC_KEY == SECRET
     raise ImproperlyConfigured(
         "PORTAL_HMAC_KEY must be a random value of at least 32 characters, independent of DJANGO_SECRET_KEY."
     )
+if any(len(k) < 32 or k == SECRET_KEY for k in PORTAL_HMAC_KEY_FALLBACKS):
+    raise ImproperlyConfigured("PORTAL_HMAC_KEY_FALLBACKS entries must be former HMAC keys (>= 32 characters).")
 
 CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
 for origin in CSRF_TRUSTED_ORIGINS:

@@ -31,11 +31,12 @@ from apps.administration.forms import (
     StudentRecordForm,
     UserSearchForm,
 )
+from apps.core import jobs
 from apps.core.authz import capabilities_of, deny, get_in_scope_or_404, has_capability, is_allowed
 from apps.core.authz.decorators import capability_required, policy_required
 from apps.core.context import RequestContext
 from apps.core.dashboard import admin_statistics
-from apps.core.models import AuditLog, SecurityEvent, SecurityEventType
+from apps.core.models import AuditLog, MaintenanceRun, SecurityEvent, SecurityEventType
 from apps.timetable.services import TimetableConflict, set_offering_lecturer
 
 PAGE = 30
@@ -383,3 +384,15 @@ def security_events_view(request):
     page, query = _page(request, qs)
     return render(request, "administration/security_events.html", {
         "form": form, "page": page, "query": query, "types": SecurityEventType})
+
+
+@capability_required("manage_backups")
+def operations_view(request):
+    """Scheduled jobs, backups and restore tests: what ran, when, and whether it worked (read-only)."""
+    runs = MaintenanceRun.objects.order_by("-started_at")
+    job = request.GET.get("job", "")
+    if job in jobs.JOBS_BY_NAME:
+        runs = runs.filter(job=job)
+    page, query = _page(request, runs)
+    return render(request, "administration/operations.html", {
+        "status": jobs.status(), "page": page, "query": query, "job": job, "job_names": list(jobs.JOBS_BY_NAME)})

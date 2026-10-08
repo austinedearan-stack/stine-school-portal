@@ -1,0 +1,9 @@
+# Files that are executed or mounted inside Linux containers must keep LF line endings even on a
+# Windows checkout (core.autocrlf=true would otherwise break shell scripts and nginx includes).
+* text=auto
+*.sh text eol=lf
+deploy/** text eol=lf
+Dockerfile text eol=lf
+*.yml text eol=lf
+*.png binary
+*.ico binary

@@ -151,6 +151,8 @@ AUTH_PASSWORD_VALIDATORS = [
 # and for keyed hashing of one-time codes. Required in production; see .env.example.
 MFA_ENCRYPTION_KEYS = env_list("MFA_ENCRYPTION_KEYS")
 PORTAL_HMAC_KEY = env_str("PORTAL_HMAC_KEY")
+# Previous HMAC keys, accepted for lookups only during a rotation (DEPLOYMENT.md "Secret rotation").
+PORTAL_HMAC_KEY_FALLBACKS = env_list("PORTAL_HMAC_KEY_FALLBACKS")
 MFA_ISSUER_NAME = env_str("MFA_ISSUER_NAME", "University Student Portal")
 
 # --- Sessions, cookies, CSRF ----------------------------------------------------------------------
@@ -214,6 +216,16 @@ MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024
 PRIVATE_FILE_SCANNER = env_str("PRIVATE_FILE_SCANNER", "")
 # When set (production behind Nginx), downloads are delegated with X-Accel-Redirect to this internal location.
 PRIVATE_FILES_X_ACCEL_PREFIX = env_str("PRIVATE_FILES_X_ACCEL_PREFIX", "")
+
+# Backups and the restore test (BACKUP_AND_RESTORE.md). pg_dump should run as the schema owner and the
+# restore test needs a role with CREATEDB; both fall back to the default database credentials.
+BACKUP_DIR = Path(env_str("BACKUP_DIR", str(BASE_DIR / "var" / "backups")))
+BACKUP_KEEP = env_int("BACKUP_KEEP", 14, minimum=1)
+BACKUP_DB_USER = env_str("BACKUP_DB_USER", "")
+BACKUP_DB_PASSWORD = env_str("BACKUP_DB_PASSWORD", "")
+RESTORE_DB_USER = env_str("RESTORE_DB_USER", "")
+RESTORE_DB_PASSWORD = env_str("RESTORE_DB_PASSWORD", "")
+RESTORE_SCRATCH_DB = env_str("RESTORE_SCRATCH_DB", "")  # default: <DB_NAME>_restore_test
 
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},

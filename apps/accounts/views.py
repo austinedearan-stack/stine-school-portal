@@ -211,8 +211,9 @@ def mfa_enroll_view(request):
         form = EnrollmentCodeForm(request.POST or None)
         if request.method == "POST" and form.is_valid():
             code = form.cleaned_data["enrollment_code"]
-            if mfa.check_enrollment_code(user, code):
-                sessions.update_preauth(request, enroll_digest=mfa.enrollment_code_digest(code))
+            digest = mfa.matching_enrollment_digest(user, code)
+            if digest:
+                sessions.update_preauth(request, enroll_digest=digest)
                 _set_pending_secret(request, mfa.new_secret())
                 return redirect("accounts:mfa_enroll")
             try:

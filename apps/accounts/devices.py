@@ -16,7 +16,7 @@ from django.core import signing
 from django.utils import timezone
 
 from apps.accounts.models import TrustedDevice, User
-from apps.core.crypto import keyed_digest
+from apps.core.crypto import keyed_digest, keyed_digests
 
 SALT = "portal.device-cookie"
 MAX_AGE = timedelta(days=180)
@@ -55,7 +55,7 @@ def valid_device_for(request, user: User | None) -> TrustedDevice | None:
     if data is None or data["u"] != str(user.pk):
         return None
     device = TrustedDevice.objects.filter(
-        user=user, nonce_hash=keyed_digest(str(data["n"]), purpose="device"), revoked_at__isnull=True,
+        user=user, nonce_hash__in=keyed_digests(str(data["n"]), purpose="device"), revoked_at__isnull=True,
         created_at__gte=timezone.now() - MAX_AGE,
     ).first()
     if device is not None:

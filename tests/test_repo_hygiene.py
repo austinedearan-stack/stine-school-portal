@@ -46,7 +46,8 @@ def test_secret_scan_ignores_enum_labels(tmp_path):
 
 
 # Migration-only DDL helpers (triggers, sequences, privileges) are the one sanctioned use of raw SQL.
-RAW_SQL_ALLOWED = {"apps/core/db_guards.py"}
+# Reviewed: constant SQL only (triggers; snapshot export; CREATE/DROP of a quoted scratch identifier).
+RAW_SQL_ALLOWED = {"apps/core/db_guards.py", "apps/core/backups.py"}
 
 
 def test_no_csrf_exempt_or_raw_sql_in_apps():

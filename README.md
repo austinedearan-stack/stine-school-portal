@@ -22,11 +22,27 @@ the project brief, with the server — not the browser — enforcing every secur
 | 12 | Security hardening | **Done** — see below |
 | 13 | Automated testing | **Done** — see below |
 | 14 | Adversarial testing | **Done** — see below |
-| 15 | Deployment preparation | Not started |
+| 15 | Deployment preparation | **Done** — see below |
 
-**All specified modules are implemented and tested (Phases 1–11).** Security hardening, the full test and
-adversarial campaigns and deployment preparation (Phases 12–15) are still to come; do not deploy to
-production before they are complete.
+**All 15 phases are complete.** Every module is implemented and tested, hardened, attacked (see
+`SECURITY_TEST_REPORT.md`) and packaged for deployment (`DEPLOYMENT.md`). Before production use: run the
+PostgreSQL-only tests (CI does), deploy to staging, run `scripts/security_probe.py` against it, and complete a
+restore rehearsal (`BACKUP_AND_RESTORE.md` §5). We describe the system as having security controls implemented and
+tested against the defined test cases — not as "secure".
+
+Phase 15 delivered:
+
+* Production stack `docker-compose.prod.yml`: Nginx (only published service) → Gunicorn/Django, PostgreSQL and Redis
+  on an internal network, a scheduler and a backup container; read-only, capability-dropped containers; owner
+  credentials only in the migrate and backup services (`deploy/env/*.env.example`).
+* `deploy/nginx`: TLS 1.2/1.3, unknown hosts refused, version hidden, body/rate limits, internal X-Accel location
+  for authorized private downloads. `deploy/gunicorn.conf.py`: timeouts, header limits, no query strings in logs.
+* Backups (`backup_portal`): snapshot-consistent `pg_dump` + uploads + manifest; weekly automated **restore test**
+  (`restore_test`) that restores into a scratch database and re-verifies row counts, migrations, seal chains and
+  uploads; encrypted off-site copies (`deploy/scripts/offsite_copy.sh`). See `BACKUP_AND_RESTORE.md`.
+* Scheduled jobs (`run_jobs`) with an **Operations & backups** page for SUPERADMINs showing overdue/failed jobs.
+* Key rotation without lock-out: `PORTAL_HMAC_KEY_FALLBACKS`; full secret rotation runbook in `DEPLOYMENT.md` §8.
+* CI: PostgreSQL 16 client for the restore test; deploy job runs `docker compose config`, `nginx -t` and shellcheck.
 
 Phase 14 delivered:
 
@@ -248,6 +264,9 @@ first superadmin with `python manage.py create_portal_superadmin --username ... 
 | Secret scan | `python scripts/secret_scan.py` (also runs in pre-commit and CI) |
 | Production config check | `DJANGO_SETTINGS_MODULE=portal_config.settings.production python manage.py check --deploy` |
 | Install git hooks | `pip install pre-commit && pre-commit install` |
+| Scheduled jobs | `python manage.py run_jobs --once` (or `--job <name>`; see `DEPLOYMENT.md` §6) |
+| Backup / restore test | `python manage.py backup_portal` · `python manage.py restore_test` |
+| Black-box probe | `python scripts/security_probe.py https://<staging-host>` |
 
 ## Documentation
 

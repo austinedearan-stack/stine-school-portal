@@ -22,7 +22,7 @@ from django.utils.crypto import constant_time_compare
 from apps.accounts.models import MFADevice, MFAEnrollmentCode, MFARecoveryCode, TrustedDevice, User
 from apps.core.authz import has_any_capability
 from apps.core.capabilities import Role
-from apps.core.crypto import decrypt, encrypt, keyed_digest, normalise_code, random_code
+from apps.core.crypto import decrypt, encrypt, keyed_digest, keyed_digests, normalise_code, random_code
 
 RECOVERY_CODE_COUNT = 10
 RECOVERY_CODE_LENGTH = 16  # 80 bits
@@ -136,7 +136,7 @@ def use_recovery_code(user: User, candidate: str) -> bool:
     if len(code) != RECOVERY_CODE_LENGTH:
         return False
     used = MFARecoveryCode.objects.filter(
-        user=user, code_hash=keyed_digest(code, purpose="mfa-recovery"), used_at__isnull=True
+        user=user, code_hash__in=keyed_digests(code, purpose="mfa-recovery"), used_at__isnull=True
     ).update(used_at=timezone.now())
     return used == 1
 
@@ -168,18 +168,19 @@ def issue_enrollment_code(user: User, issued_by: User | None) -> str:
     return format_code(code)
 
 
-def check_enrollment_code(user: User, candidate: str) -> bool:
+def matching_enrollment_digest(user: User, candidate: str) -> str | None:
+    """The stored digest of the live code ``candidate`` matches (kept in the session instead of the code)."""
     code = normalise_code(candidate)
     if len(code) != ENROLLMENT_CODE_LENGTH:
-        return False
+        return None
     return MFAEnrollmentCode.objects.filter(
-        user=user, code_hash=keyed_digest(code, purpose="mfa-enrollment"), used_at__isnull=True,
+        user=user, code_hash__in=keyed_digests(code, purpose="mfa-enrollment"), used_at__isnull=True,
         expires_at__gt=timezone.now(),
-    ).exists()
+    ).values_list("code_hash", flat=True).first()
 
 
-def enrollment_code_digest(candidate: str) -> str:
-    return keyed_digest(normalise_code(candidate), purpose="mfa-enrollment")
+def check_enrollment_code(user: User, candidate: str) -> bool:
+    return matching_enrollment_digest(user, candidate) is not None
 
 
 def consume_enrollment_code(user: User, digest: str) -> bool:

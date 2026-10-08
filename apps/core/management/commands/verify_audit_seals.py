@@ -1,8 +1,6 @@
 """Verify the audit seal chains; exits non-zero (for monitoring) if anything was altered."""
 
-import sys
-
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 
 from apps.core.seals import verify_all
 
@@ -15,5 +13,5 @@ class Command(BaseCommand):
         for problem in problems:
             self.stderr.write(problem)
         if problems:
-            sys.exit(1)
+            raise CommandError(f"{len(problems)} audit seal problem(s) found.")
         self.stdout.write("All audit seals verified.")

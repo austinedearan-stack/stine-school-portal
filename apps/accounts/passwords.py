@@ -19,7 +19,7 @@ from apps.accounts.devices import revoke_all
 from apps.accounts.models import PasswordResetCode, User
 from apps.core.audit import record_audit_event, record_security_event
 from apps.core.context import RequestContext
-from apps.core.crypto import keyed_digest, normalise_code, random_code
+from apps.core.crypto import keyed_digest, keyed_digests, normalise_code, random_code
 from apps.core.mail import send_security_mail
 from apps.core.models import SecurityEventType
 
@@ -44,6 +44,10 @@ def generate_initial_password(length: int = 20) -> str:
 
 def _digest(code: str) -> str:
     return keyed_digest(normalise_code(code), purpose="password-reset")
+
+
+def _digests(code: str) -> list[str]:
+    return keyed_digests(normalise_code(code), purpose="password-reset")
 
 
 def request_reset(user: User | None, ctx: RequestContext) -> None:
@@ -72,7 +76,7 @@ def code_is_valid(user: User | None, code: str) -> bool:
     live = PasswordResetCode.objects.filter(
         user=user, used_at__isnull=True, expires_at__gt=timezone.now(), attempts__lt=MAX_ATTEMPTS
     )
-    if live.filter(code_hash=_digest(code)).exists():
+    if live.filter(code_hash__in=_digests(code)).exists():
         return True
     live.update(attempts=F("attempts") + 1)
     return False
@@ -81,7 +85,7 @@ def code_is_valid(user: User | None, code: str) -> bool:
 @transaction.atomic
 def complete_reset(user: User, code: str, new_password: str, ctx: RequestContext) -> bool:
     used = PasswordResetCode.objects.filter(
-        user=user, code_hash=_digest(code), used_at__isnull=True, expires_at__gt=timezone.now(),
+        user=user, code_hash__in=_digests(code), used_at__isnull=True, expires_at__gt=timezone.now(),
         attempts__lt=MAX_ATTEMPTS,
     ).update(used_at=timezone.now())
     if used != 1:

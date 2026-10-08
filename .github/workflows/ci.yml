@@ -37,8 +37,14 @@ jobs:
         run: pip-audit -r requirements/prod.txt
       - name: Migrations are committed
         run: python manage.py makemigrations --check --dry-run --settings=portal_config.settings.testing
+      - name: PostgreSQL 16 client (backup and restore test)
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q postgresql-client-16
+          echo "/usr/lib/postgresql/16/bin" >> "$GITHUB_PATH"
       - name: Tests (PostgreSQL)
-        run: pytest --cov --cov-report=term-missing
+        run: |
+          pg_dump --version
+          pytest --cov --cov-report=term-missing
       - name: Deploy checks with production settings
         env:
           DJANGO_SETTINGS_MODULE: portal_config.settings.production
@@ -52,3 +58,28 @@ jobs:
           export MFA_ENCRYPTION_KEYS="$(python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')"
           export PORTAL_HMAC_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
           python manage.py check --deploy --fail-level WARNING
+
+  deploy-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Production compose file is valid
+        run: |
+          mkdir -p ci-env
+          for f in deploy/env/*.env.example; do cp "$f" "ci-env/$(basename "$f" .example)"; done
+          export PORTAL_HOST=portal.example.test \
+            PORTAL_ENV_FILE="$PWD/ci-env/portal.env" PORTAL_OWNER_ENV_FILE="$PWD/ci-env/owner.env" \
+            PORTAL_BACKUP_ENV_FILE="$PWD/ci-env/backup.env" PORTAL_DB_ENV_FILE="$PWD/ci-env/db.env" \
+            PORTAL_REDIS_ENV_FILE="$PWD/ci-env/redis.env"
+          docker compose -f docker-compose.prod.yml config -q
+      - name: Nginx configuration test
+        run: |
+          mkdir -p tls
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 -subj "/CN=portal.example.test" \
+            -keyout tls/privkey.pem -out tls/fullchain.pem
+          docker run --rm --add-host web:127.0.0.1 \
+            -e PORTAL_HOST=portal.example.test -e NGINX_ENVSUBST_FILTER='^PORTAL_' \
+            -v "$PWD/deploy/nginx/templates:/etc/nginx/templates:ro" -v "$PWD/tls:/etc/nginx/tls:ro" \
+            nginx:1.28-alpine nginx -t
+      - name: Shell scripts
+        run: shellcheck deploy/postgres/init/01-roles.sh deploy/scripts/offsite_copy.sh
