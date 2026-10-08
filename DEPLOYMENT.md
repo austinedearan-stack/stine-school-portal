@@ -246,7 +246,11 @@ Use only seeded fake accounts. Delete the project when testing is finished.
    set -a; . var/vercel.env; set +a
    DJANGO_SETTINGS_MODULE=portal_config.settings.vercel python manage.py migrate --noinput
    DJANGO_SETTINGS_MODULE=portal_config.settings.vercel python manage.py create_portal_superadmin --username admin --email admin@example.test
+   # or fake demo accounts (written to var/, never committed):
+   DJANGO_SETTINGS_MODULE=portal_config.settings.vercel python manage.py seed_demo_data --allow-non-debug > var/vercel-credentials.txt
    ```
+   `DJANGO_SECRET_KEY` in `var/vercel.env` must equal the one set in Vercel: the MFA and one-time-code
+   keys are derived from it, so a mismatch makes enrollment codes invalid on the live site.
 4. **Deploy.** Every push to `main` deploys automatically. Open `https://<project>.vercel.app/healthz`
    (expect `ok`), then run `python scripts/security_probe.py https://<project>.vercel.app`.
 5. **Finish.** Settings → Delete Project, and delete the Neon database.
