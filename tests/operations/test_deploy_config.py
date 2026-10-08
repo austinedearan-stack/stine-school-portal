@@ -101,8 +101,12 @@ def test_gunicorn_config_values():
     assert 1 <= namespace["workers"] <= 9
 
 
-def test_env_examples_hold_placeholders_only():
-    for path in (ROOT / "deploy/env").glob("*.env.example"):
+def test_env_examples_exist_and_hold_placeholders_only():
+    examples = sorted((ROOT / "deploy/env").glob("*.env.example"))
+    # All six must be committed (a broad "env/" ignore pattern once hid them, which broke CI).
+    assert [p.name for p in examples] == [f"{n}.env.example" for n in
+                                          ("backup", "compose", "db", "owner", "portal", "redis")]
+    for path in examples:
         for line in path.read_text(encoding="utf-8").splitlines():
             if line and not line.startswith("#") and ("PASSWORD" in line or "KEY" in line.split("=")[0]):
                 assert "=<" in line, f"{path.name}: {line}"
