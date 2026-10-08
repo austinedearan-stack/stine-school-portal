@@ -29,7 +29,7 @@ source = ["apps", "portal_config"]
 # does not trace; they are excluded here rather than counted as untested.
 omit = ["*/migrations/*", "*/tests/*", "portal_config/asgi.py", "portal_config/wsgi.py",
         "portal_config/settings/collectstatic.py", "portal_config/settings/development.py",
-        "portal_config/settings/production.py"]
+        "portal_config/settings/production.py", "portal_config/settings/vercel.py", "api/index.py"]
 branch = true
 
 [tool.coverage.report]

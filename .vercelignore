@@ -1,0 +1,9 @@
+# Never upload local secrets or data to Vercel (CLI deploys).
+.env
+.env.*
+var/
+.venv/
+staticfiles/
+*.bundle
+tests/
+docs/

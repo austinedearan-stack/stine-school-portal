@@ -1,0 +1,2 @@
+# Used by Vercel (temporary test deployment); the pinned lists live in requirements/.
+-r requirements/base.txt

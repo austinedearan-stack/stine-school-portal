@@ -220,3 +220,46 @@ python scripts/security_probe.py https://<staging-host>     # expect all checks 
   * a job overdue or failed on the Operations page;
   * `verify_audit_seals` failures;
   * repeated 5xx in the Nginx log.
+
+## 10. Temporary test deployment on Vercel (fake data only)
+
+For trying the portal on the internet before the real server exists. Vercel runs Django as a
+serverless function (`api/index.py`, settings `portal_config.settings.vercel`), which means this is
+**not** the production design:
+
+* uploads are stored in `/tmp` and vanish when an instance is recycled;
+* login throttling counters are per function instance, not shared;
+* scheduled jobs do not run (no audit sealing, backups, offer expiry or outbox);
+* e-mail, including password-reset codes, is written to the function log (Vercel → Logs);
+* request bodies are capped at 4.5 MB by Vercel.
+
+Use only seeded fake accounts. Delete the project when testing is finished.
+
+1. **Database.** In the Vercel dashboard: Storage → Create → **Neon** (Postgres), connect it to the
+   project. It adds `DATABASE_URL` and `DATABASE_URL_UNPOOLED`; the settings prefer the unpooled one
+   and require TLS.
+2. **Project.** Add New → Project → import `austinedearan-stack/stine-school-portal`. Framework
+   preset: *Other* (`vercel.json` sets the rest). Environment variable:
+   `DJANGO_SECRET_KEY` = output of `python -c "import secrets; print(secrets.token_urlsafe(64))"`.
+3. **Schema and demo data** (from this machine, once, with the Neon URL in `var/vercel.env`):
+   ```bash
+   set -a; . var/vercel.env; set +a
+   DJANGO_SETTINGS_MODULE=portal_config.settings.vercel python manage.py migrate --noinput
+   DJANGO_SETTINGS_MODULE=portal_config.settings.vercel python manage.py create_portal_superadmin --username admin --email admin@example.test
+   ```
+4. **Deploy.** Every push to `main` deploys automatically. Open `https://<project>.vercel.app/healthz`
+   (expect `ok`), then run `python scripts/security_probe.py https://<project>.vercel.app`.
+5. **Finish.** Settings → Delete Project, and delete the Neon database.
+
+## 11. Full production-like stack on a Windows PC
+
+Needed to run `docker-compose.prod.yml` (Nginx, Gunicorn, PostgreSQL 16, Redis, scheduler, backups)
+locally:
+
+* **WSL 2** with an **Ubuntu** distribution (`wsl --install -d Ubuntu`);
+* **Docker Desktop for Windows** (WSL 2 backend; includes Docker Compose v2);
+* **mkcert** for a locally trusted TLS certificate for `localhost` (Nginx needs a certificate);
+* optional: **Node.js LTS** if you want the Vercel CLI (`npm i -g vercel`) instead of Git-based deploys.
+
+Then copy `deploy/env/*.env.example` into a private folder, fill them in, set `PORTAL_HOST=localhost`
+and the `PORTAL_*_FILE` / `PORTAL_TLS_DIR` paths in `compose.env`, and follow section 2 from step 3.
