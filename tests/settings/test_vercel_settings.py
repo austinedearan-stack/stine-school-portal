@@ -71,6 +71,10 @@ def test_vercel_requirements_match_the_pinned_base_list():
                       if line.split("#")[0].strip())
 
     assert pins("requirements.txt") == pins("requirements/base.txt")
+    import tomllib
+
+    project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))["project"]
+    assert sorted(project["dependencies"]) == pins("requirements/base.txt")  # Vercel installs from pyproject
 
 
 def test_vercel_sends_every_request_to_django():

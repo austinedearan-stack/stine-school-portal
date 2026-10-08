@@ -3,6 +3,19 @@ name = "school-portal"
 version = "0.1.0"
 requires-python = ">=3.12"
 description = "University student information and services portal"
+# Runtime pins, identical to requirements/base.txt (Vercel installs from here; a test keeps them in sync).
+dependencies = [
+    "Django==5.2.18",
+    "djangorestframework==3.18.3",
+    "argon2-cffi==25.1.0",
+    "pyotp==2.10.0",
+    "cryptography==50.0.2",
+    "qrcode[pil]==8.2",
+    "pillow==12.3.0",
+    "whitenoise==6.12.0",
+    "psycopg[binary]==3.3.6",
+    "redis==8.1.0",
+]
 
 [tool.ruff]
 line-length = 120
