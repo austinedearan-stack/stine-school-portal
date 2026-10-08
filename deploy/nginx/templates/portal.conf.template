@@ -11,7 +11,6 @@ client_max_body_size 12m;            # = MAX_REQUEST_BYTES (12 MiB); Django reje
 client_body_timeout 15s;
 client_header_timeout 15s;
 send_timeout 30s;
-keepalive_timeout 30s;
 large_client_header_buffers 4 8k;
 
 limit_req_zone $binary_remote_addr zone=portal_auth:10m rate=10r/m;
@@ -67,6 +66,7 @@ server {
     ssl_session_tickets off;
 
     limit_conn portal_conn 50;
+    keepalive_timeout 30s;   # server level: the image's nginx.conf already sets it in http {}
 
     # Security headers (HSTS, CSP, frame, referrer, nosniff) are set by Django on every response.
     # Nginx drops the upstream Server header; with server_tokens off it only says "nginx".

@@ -86,6 +86,7 @@ jobs:
             out=$(cat); out=${out//'%'/'%25'}; out=${out//$'\r'/}; out=${out//$'\n'/'%0A'}
             echo "::error title=$1::$out"
           }
+          docker pull -q nginx:1.28-alpine > /dev/null
           docker run --rm --add-host web:127.0.0.1 \
             -e PORTAL_HOST=portal.example.test -e NGINX_ENVSUBST_FILTER='^PORTAL_' \
             -v "$PWD/deploy/nginx/templates:/etc/nginx/templates:ro" -v "$PWD/tls:/etc/nginx/tls:ro" \

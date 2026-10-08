@@ -27,6 +27,12 @@ def test_nginx_hides_versions_and_limits_bodies_like_django():
     assert "autoindex on" not in NGINX
 
 
+def test_nginx_template_does_not_repeat_directives_of_the_images_http_block():
+    """The official image's nginx.conf sets these in http {}; repeating them there is a fatal duplicate."""
+    for directive in ("keepalive_timeout", "sendfile", "default_type", "access_log"):
+        assert not re.search(rf"^{directive}\b", NGINX, re.M), directive
+
+
 def test_nginx_tls_is_modern_and_unknown_hosts_are_refused():
     protocols = re.search(r"ssl_protocols ([^;]+);", NGINX).group(1).split()
     assert protocols == ["TLSv1.2", "TLSv1.3"]
