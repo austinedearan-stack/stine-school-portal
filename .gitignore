@@ -75,3 +75,8 @@ backups/
 
 # Vercel build output (generated)
 /public/
+
+# Local-only design/ops notes (not published; README.md stays)
+/*.md
+!/README.md
+/docs/
