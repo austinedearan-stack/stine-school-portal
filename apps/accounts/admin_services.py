@@ -18,7 +18,7 @@ from apps.accounts import devices, mfa, passwords, sessions
 from apps.accounts.models import User
 from apps.core.audit import record_audit_event, record_security_event
 from apps.core.authz import authorize, has_capability
-from apps.core.capabilities import CAPABILITIES, Role, default_groups, role_may_hold
+from apps.core.capabilities import Role, role_may_hold
 from apps.core.context import RequestContext
 from apps.core.models import SecurityEventType
 from apps.notifications.services import notify
@@ -156,11 +156,3 @@ def force_password_reset(actor: User, target: User, ctx: RequestContext) -> None
 
 def _end_sessions(user: User) -> None:
     sessions.end_all_sessions(user)
-
-
-def default_group_names() -> list[str]:
-    return sorted(default_groups())
-
-
-def capability_names() -> list[str]:
-    return sorted(CAPABILITIES)

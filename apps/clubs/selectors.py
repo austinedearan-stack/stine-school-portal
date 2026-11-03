@@ -5,7 +5,7 @@ from __future__ import annotations
 from django.db.models import Count, Q
 from django.utils import timezone
 
-from apps.clubs.models import Club, ClubEvent, ClubMembership, EventVisibility, MembershipStatus
+from apps.clubs.models import Club, ClubMembership, EventVisibility, MembershipStatus
 
 
 def directory(*, query: str = "", kind: str = "", category: str = ""):
@@ -51,7 +51,3 @@ def members(club):
 def pending(club):
     return club.memberships.filter(status=MembershipStatus.PENDING).select_related(
         "student__user", "student__program").order_by("created_at")
-
-
-def events_for_management(club):
-    return ClubEvent.objects.filter(club=club).order_by("-starts_at")
